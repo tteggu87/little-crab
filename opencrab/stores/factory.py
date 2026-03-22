@@ -67,4 +67,4 @@ def make_sql_store(settings: Settings) -> Any:
     from opencrab.stores.sql_store import SQLStore
 
     url = settings.sqlite_url if settings.is_local else settings.postgres_url
-    return SQLStore(database_url=url)
+    return SQLStore(url=url)

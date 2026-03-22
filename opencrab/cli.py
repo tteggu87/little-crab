@@ -129,26 +129,44 @@ def serve() -> None:
 def status() -> None:
     """Check connectivity to all configured data stores."""
     from opencrab.config import get_settings
-    from opencrab.stores.chroma_store import ChromaStore
-    from opencrab.stores.mongo_store import MongoStore
-    from opencrab.stores.neo4j_store import Neo4jStore
-    from opencrab.stores.sql_store import SQLStore
+    from opencrab.stores.factory import (
+        make_doc_store,
+        make_graph_store,
+        make_sql_store,
+        make_vector_store,
+    )
 
     cfg = get_settings()
+    mode_label = f"[bold cyan]{cfg.storage_mode.upper()} MODE[/bold cyan]"
+    storage_loc = cfg.local_data_dir if cfg.is_local else "Docker services"
+    console.print(f"\n{mode_label} - storage at: {storage_loc}\n")
+
+    graph  = make_graph_store(cfg)
+    vector = make_vector_store(cfg)
+    docs   = make_doc_store(cfg)
+    sql    = make_sql_store(cfg)
+
+    if cfg.is_local:
+        store_rows: list[tuple[str, str, Any]] = [
+            ("Graph (SQLite)",    cfg.local_data_dir + "/graph.db",    graph),
+            ("Vector (ChromaDB)", cfg.local_data_dir + "/chroma",      vector),
+            ("Docs (JSON files)", cfg.local_data_dir + "/docs",        docs),
+            ("SQL (SQLite)",      cfg.local_data_dir + "/opencrab.db", sql),
+        ]
+    else:
+        store_rows = [
+            ("Graph (Neo4j)",     cfg.neo4j_uri,                      graph),
+            ("Docs (MongoDB)",    cfg.mongodb_uri.split("@")[-1],     docs),
+            ("SQL (PostgreSQL)",  cfg.postgres_url.split("@")[-1],    sql),
+            ("Vector (ChromaDB)", cfg.chroma_url,                     vector),
+        ]
 
     table = Table(title="OpenCrab Store Status", show_header=True, header_style="bold cyan")
     table.add_column("Store", style="bold")
-    table.add_column("URL")
+    table.add_column("Path / URL")
     table.add_column("Status")
 
-    stores: list[tuple[str, str, Any]] = [
-        ("Neo4j", cfg.neo4j_uri, Neo4jStore(cfg.neo4j_uri, cfg.neo4j_user, cfg.neo4j_password)),
-        ("MongoDB", cfg.mongodb_uri.split("@")[-1], MongoStore(cfg.mongodb_uri, cfg.mongodb_db)),
-        ("PostgreSQL", cfg.postgres_url.split("@")[-1], SQLStore(cfg.postgres_url)),
-        ("ChromaDB", cfg.chroma_url, ChromaStore(cfg.chroma_host, cfg.chroma_port, cfg.chroma_collection)),
-    ]
-
-    for name, url, store in stores:
+    for name, url, store in store_rows:
         if store.available:
             try:
                 ok = store.ping()
@@ -175,14 +193,12 @@ def ingest(path: str, recursive: bool, extension: str) -> None:
     """Ingest files from PATH into the ontology vector store."""
     from opencrab.config import get_settings
     from opencrab.ontology.query import HybridQuery
-    from opencrab.stores.chroma_store import ChromaStore
-    from opencrab.stores.mongo_store import MongoStore
-    from opencrab.stores.neo4j_store import Neo4jStore
+    from opencrab.stores.factory import make_doc_store, make_graph_store, make_vector_store
 
     cfg = get_settings()
-    chroma = ChromaStore(cfg.chroma_host, cfg.chroma_port, cfg.chroma_collection)
-    neo4j = Neo4jStore(cfg.neo4j_uri, cfg.neo4j_user, cfg.neo4j_password)
-    mongo = MongoStore(cfg.mongodb_uri, cfg.mongodb_db)
+    chroma = make_vector_store(cfg)
+    neo4j = make_graph_store(cfg)
+    mongo = make_doc_store(cfg)
     hybrid = HybridQuery(chroma, neo4j)
 
     extensions = [e.strip() for e in extension.split(",")]
@@ -232,12 +248,11 @@ def query(question: str, spaces: str | None, limit: int, json_output: bool) -> N
     """Run a hybrid query and print results."""
     from opencrab.config import get_settings
     from opencrab.ontology.query import HybridQuery
-    from opencrab.stores.chroma_store import ChromaStore
-    from opencrab.stores.neo4j_store import Neo4jStore
+    from opencrab.stores.factory import make_graph_store, make_vector_store
 
     cfg = get_settings()
-    chroma = ChromaStore(cfg.chroma_host, cfg.chroma_port, cfg.chroma_collection)
-    neo4j = Neo4jStore(cfg.neo4j_uri, cfg.neo4j_user, cfg.neo4j_password)
+    chroma = make_vector_store(cfg)
+    neo4j = make_graph_store(cfg)
     hybrid = HybridQuery(chroma, neo4j)
 
     space_filter = [s.strip() for s in spaces.split(",")] if spaces else None

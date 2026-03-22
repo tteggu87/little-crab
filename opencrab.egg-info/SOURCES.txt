@@ -23,6 +23,9 @@ opencrab/ontology/query.py
 opencrab/ontology/rebac.py
 opencrab/stores/__init__.py
 opencrab/stores/chroma_store.py
+opencrab/stores/factory.py
+opencrab/stores/local_doc_store.py
+opencrab/stores/local_graph_store.py
 opencrab/stores/mongo_store.py
 opencrab/stores/neo4j_store.py
 opencrab/stores/sql_store.py
