@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -24,7 +23,6 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich import print as rprint
 
 console = Console()
 
@@ -207,7 +205,7 @@ def ingest(path: str, recursive: bool, extension: str) -> None:
             source_id = str(file.resolve())
             meta = {"source_path": str(file), "extension": file.suffix}
 
-            result = hybrid.ingest(text=text, source_id=source_id, metadata=meta)
+            hybrid.ingest(text=text, source_id=source_id, metadata=meta)
 
             if mongo.available:
                 mongo.upsert_source(source_id, text, meta)

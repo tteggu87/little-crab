@@ -9,8 +9,9 @@ All methods gracefully handle connection failures.
 from __future__ import annotations
 
 import logging
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -246,13 +247,13 @@ class Neo4jStore:
         if not self._available:
             raise RuntimeError("Neo4j is not available.")
 
-        cypher = """
+        cypher = f"""
             MATCH path = shortestPath(
-                (a {id: $from_id})-[*1..{max_depth}]-(b {id: $to_id})
+                (a {{id: $from_id}})-[*1..{max_depth}]-(b {{id: $to_id}})
             )
             RETURN [node IN nodes(path) | properties(node)] AS node_props,
                    [rel IN relationships(path) | type(rel)] AS rel_types
-        """.format(max_depth=max_depth)
+        """
         with self._session() as session:
             result = session.run(cypher, from_id=from_id, to_id=to_id)
             record = result.single()

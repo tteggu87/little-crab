@@ -19,7 +19,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from opencrab.grammar.manifest import REBAC_PERMISSIONS
 from opencrab.grammar.validator import validate_rebac_permission
 from opencrab.stores.neo4j_store import Neo4jStore
 from opencrab.stores.sql_store import SQLStore

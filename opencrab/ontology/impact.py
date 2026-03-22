@@ -21,7 +21,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from opencrab.grammar.manifest import IMPACT_CATEGORIES, SPACES, space_for_node_type
+from opencrab.grammar.manifest import IMPACT_CATEGORIES, space_for_node_type
 from opencrab.stores.neo4j_store import Neo4jStore
 from opencrab.stores.sql_store import SQLStore
 

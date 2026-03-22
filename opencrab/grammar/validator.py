@@ -12,7 +12,6 @@ from typing import Any
 
 from opencrab.grammar.manifest import META_EDGES, SPACES
 
-
 # ---------------------------------------------------------------------------
 # Internal lookup tables (built once at import time)
 # ---------------------------------------------------------------------------

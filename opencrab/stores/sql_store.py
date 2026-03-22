@@ -9,7 +9,6 @@ Falls back to SQLite for development if Postgres is unavailable.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)

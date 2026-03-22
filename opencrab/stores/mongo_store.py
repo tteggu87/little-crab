@@ -8,7 +8,7 @@ audit logs. Uses pymongo with a connection pool.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,6 @@ class MongoStore:
     def _connect(self) -> None:
         try:
             from pymongo import MongoClient  # type: ignore[import]
-            from pymongo.errors import ConnectionFailure
 
             self._client = MongoClient(self._uri, serverSelectionTimeoutMS=5000)
             # Force connection check
@@ -100,11 +99,11 @@ class MongoStore:
             "node_type": node_type,
             "node_id": node_id,
             "properties": properties,
-            "updated_at": datetime.now(tz=timezone.utc),
+            "updated_at": datetime.now(tz=UTC),
         }
         result = self._db["nodes"].update_one(
             {"space": space, "node_id": node_id},
-            {"$set": doc, "$setOnInsert": {"created_at": datetime.now(tz=timezone.utc)}},
+            {"$set": doc, "$setOnInsert": {"created_at": datetime.now(tz=UTC)}},
             upsert=True,
         )
         if result.upserted_id:
@@ -164,11 +163,11 @@ class MongoStore:
             "source_id": source_id,
             "text": text,
             "metadata": metadata,
-            "updated_at": datetime.now(tz=timezone.utc),
+            "updated_at": datetime.now(tz=UTC),
         }
         result = self._db["sources"].update_one(
             {"source_id": source_id},
-            {"$set": doc, "$setOnInsert": {"created_at": datetime.now(tz=timezone.utc)}},
+            {"$set": doc, "$setOnInsert": {"created_at": datetime.now(tz=UTC)}},
             upsert=True,
         )
         if result.upserted_id:
@@ -212,7 +211,7 @@ class MongoStore:
                     "event_type": event_type,
                     "subject_id": subject_id,
                     "details": details,
-                    "timestamp": datetime.now(tz=timezone.utc),
+                    "timestamp": datetime.now(tz=UTC),
                 }
             )
         except Exception as exc:
