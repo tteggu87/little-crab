@@ -171,7 +171,9 @@ class MCPServer:
             result = {"error": str(exc)}
 
         # MCP content format: wrap result in a content list
-        content_text = json.dumps(result, ensure_ascii=False, default=str)
+        # Use ensure_ascii=True to avoid invalid Unicode surrogates (e.g. from
+        # Korean/CJK data) crashing the Claude API JSON parser.
+        content_text = json.dumps(result, ensure_ascii=True, default=str)
         return {
             "content": [
                 {
