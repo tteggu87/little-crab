@@ -128,6 +128,12 @@ opencrab query "system performance and error rates"
 opencrab manifest    # see the full grammar
 ```
 
+### Local vector mode
+
+When `STORAGE_MODE=local`, OpenCrab uses ChromaDB's embedded `PersistentClient`
+under `LOCAL_DATA_DIR/chroma`. No Chroma HTTP server is required for ingest/query
+in the embedded path.
+
 ---
 
 ## Claude Code MCP Configuration

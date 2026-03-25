@@ -102,6 +102,18 @@ class TestChromaStoreUnit:
         store = ChromaStore("invalid-host", 9999, "test_collection")
         assert store.count() == 0
 
+    def test_factory_uses_embedded_chroma_path_in_local_mode(self, tmp_path):
+        from opencrab.config import Settings
+        from opencrab.stores.chroma_store import ChromaStore
+        from opencrab.stores.factory import make_vector_store
+
+        settings = Settings(STORAGE_MODE="local", LOCAL_DATA_DIR=str(tmp_path))
+        store = make_vector_store(settings)
+
+        assert isinstance(store, ChromaStore)
+        assert store.mode == "embedded"
+        assert store.location == str(tmp_path / "chroma")
+
     def test_sanitize_metadata(self):
         from opencrab.stores.chroma_store import _sanitize_metadata
 

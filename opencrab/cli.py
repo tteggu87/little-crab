@@ -88,6 +88,8 @@ def init(force: bool) -> None:
 
 def _write_default_env(path: Path) -> None:
     content = """\
+STORAGE_MODE=local
+LOCAL_DATA_DIR=./opencrab_data
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=opencrab
@@ -149,7 +151,7 @@ def status() -> None:
     if cfg.is_local:
         store_rows: list[tuple[str, str, Any]] = [
             ("Graph (SQLite)",    cfg.local_data_dir + "/graph.db",    graph),
-            ("Vector (ChromaDB)", cfg.local_data_dir + "/chroma",      vector),
+            ("Vector (ChromaDB Embedded)", getattr(vector, "location", cfg.local_data_dir + "/chroma"), vector),
             ("Docs (JSON files)", cfg.local_data_dir + "/docs",        docs),
             ("SQL (SQLite)",      cfg.local_data_dir + "/opencrab.db", sql),
         ]

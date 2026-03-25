@@ -75,6 +75,16 @@ class ChromaStore:
     def available(self) -> bool:
         return self._available
 
+    @property
+    def mode(self) -> str:
+        return "embedded" if self._local_mode else "http"
+
+    @property
+    def location(self) -> str:
+        if self._local_mode:
+            return self._local_path
+        return f"http://{self._host}:{self._port}"
+
     def ping(self) -> bool:
         """Return True if ChromaDB is reachable."""
         try:
