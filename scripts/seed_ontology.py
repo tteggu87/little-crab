@@ -5,7 +5,7 @@ example ontology based on a fictional data analytics platform.
 Run with:
     python scripts/seed_ontology.py
 
-Requires all services to be running (docker-compose up -d).
+Works in both embedded local mode and legacy docker mode.
 """
 
 from __future__ import annotations
@@ -184,43 +184,52 @@ def seed() -> None:
 
     from opencrab.config import get_settings
     from opencrab.ontology.builder import OntologyBuilder
-    from opencrab.ontology.impact import ImpactEngine
     from opencrab.ontology.query import HybridQuery
     from opencrab.ontology.rebac import ReBACEngine
-    from opencrab.stores.chroma_store import ChromaStore
-    from opencrab.stores.mongo_store import MongoStore
-    from opencrab.stores.neo4j_store import Neo4jStore
-    from opencrab.stores.sql_store import SQLStore
+    from opencrab.stores.factory import (
+        make_doc_store,
+        make_graph_store,
+        make_sql_store,
+        make_vector_store,
+    )
 
     cfg = get_settings()
 
     # Init stores
-    neo4j = Neo4jStore(cfg.neo4j_uri, cfg.neo4j_user, cfg.neo4j_password)
-    chroma = ChromaStore(cfg.chroma_host, cfg.chroma_port, cfg.chroma_collection)
-    mongo = MongoStore(cfg.mongodb_uri, cfg.mongodb_db)
-    sql = SQLStore(cfg.postgres_url)
+    graph = make_graph_store(cfg)
+    chroma = make_vector_store(cfg)
+    docs = make_doc_store(cfg)
+    sql = make_sql_store(cfg)
 
     # Print store status
     store_table = Table(title="Store Status", show_header=True)
     store_table.add_column("Store")
     store_table.add_column("Status")
-    for name, store in [("Neo4j", neo4j), ("ChromaDB", chroma), ("MongoDB", mongo), ("PostgreSQL", sql)]:
+    store_names = (
+        [("LadybugDB", graph), ("ChromaDB Embedded", chroma), ("DuckDB", sql)]
+        if cfg.is_local
+        else [("Neo4j", graph), ("ChromaDB", chroma), ("MongoDB", docs), ("PostgreSQL", sql)]
+    )
+    for name, store in store_names:
         status = "[green]CONNECTED[/green]" if store.available else "[red]UNAVAILABLE[/red]"
         store_table.add_row(name, status)
     console.print(store_table)
 
-    if not any([neo4j.available, chroma.available, mongo.available, sql.available]):
-        console.print("\n[red]All stores unavailable. Start services with: docker-compose up -d[/red]")
+    if not any([graph.available, chroma.available, docs.available, sql.available]):
+        if cfg.is_local:
+            console.print("\n[red]Embedded stores unavailable. Check Python dependencies and LOCAL_DATA_DIR.[/red]")
+        else:
+            console.print("\n[red]All stores unavailable. Start services with: docker compose up -d[/red]")
         return
 
-    builder = OntologyBuilder(neo4j, mongo, sql)
-    rebac = ReBACEngine(neo4j, sql)
-    hybrid = HybridQuery(chroma, neo4j)
+    builder = OntologyBuilder(graph, docs, sql)
+    rebac = ReBACEngine(graph, sql)
+    hybrid = HybridQuery(chroma, graph)
 
     # Ensure constraints
-    if neo4j.available:
-        neo4j.ensure_constraints()
-        console.print("[dim]Neo4j constraints ensured.[/dim]")
+    if graph.available and hasattr(graph, "ensure_constraints"):
+        graph.ensure_constraints()
+        console.print("[dim]Graph schema ensured.[/dim]")
 
     # --- Seed nodes ---
     console.print(f"\n[bold]Seeding {len(NODES)} nodes...[/bold]")
@@ -276,9 +285,9 @@ def seed() -> None:
     ingest_ok = 0
     for text, source_id, meta in INGEST_TEXTS:
         try:
-            result = hybrid.ingest(text=text, source_id=source_id, metadata=meta)
-            if mongo.available:
-                mongo.upsert_source(source_id, text, meta)
+            hybrid.ingest(text=text, source_id=source_id, metadata=meta)
+            if docs.available:
+                docs.upsert_source(source_id, text, meta)
             ingest_ok += 1
             console.print(f"  [green]OK[/green] {source_id} ({len(text)} chars)")
         except Exception as exc:
@@ -290,28 +299,31 @@ def seed() -> None:
     console.print("\n[bold green]Seed complete![/bold green]")
     if sql.available:
         counts = sql.table_counts()
-        summary = Table(title="PostgreSQL Table Counts")
+        summary = Table(title="DuckDB Table Counts" if cfg.is_local else "PostgreSQL Table Counts")
         summary.add_column("Table")
         summary.add_column("Rows", justify="right")
         for table, count in counts.items():
             summary.add_row(table, str(count))
         console.print(summary)
 
-    if mongo.available:
-        mongo_counts = mongo.collection_stats()
+    if docs.available and hasattr(docs, "collection_stats"):
+        doc_counts = docs.collection_stats()
+        label = "DuckDB" if cfg.is_local else "MongoDB"
         console.print(
-            f"\n[bold]MongoDB:[/bold] "
-            f"nodes={mongo_counts.get('nodes', 0)}, "
-            f"sources={mongo_counts.get('sources', 0)}, "
-            f"audit_log={mongo_counts.get('audit_log', 0)}"
+            f"\n[bold]{label}:[/bold] "
+            f"nodes={doc_counts.get('nodes', 0)}, "
+            f"sources={doc_counts.get('sources', 0)}, "
+            f"audit_log={doc_counts.get('audit_log', 0)}"
         )
 
-    if neo4j.available:
-        total_nodes = neo4j.count_nodes()
-        console.print(f"[bold]Neo4j:[/bold] {total_nodes} nodes")
+    if graph.available and hasattr(graph, "count_nodes"):
+        total_nodes = graph.count_nodes()
+        label = "LadybugDB" if cfg.is_local else "Neo4j"
+        console.print(f"[bold]{label}:[/bold] {total_nodes} nodes")
 
     if chroma.available:
-        console.print(f"[bold]ChromaDB:[/bold] {chroma.count()} vectors")
+        label = "ChromaDB Embedded" if cfg.is_local else "ChromaDB"
+        console.print(f"[bold]{label}:[/bold] {chroma.count()} vectors")
 
     console.print(
         "\n[dim]Run 'opencrab query \"system performance\"' to test the ontology.[/dim]"

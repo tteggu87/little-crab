@@ -13,9 +13,21 @@
 OpenCrab is an MCP (Model Context Protocol) server that exposes the MetaOntology OS grammar
 to any OpenClaw-compatible agent environment — Claude Code, n8n, LangGraph, and beyond.
 
+Preferred runtime path: embedded local mode with `LadybugDB + DuckDB + embedded ChromaDB`.
+The legacy `Neo4j + MongoDB + PostgreSQL + Chroma HTTP` stack remains available as a
+compatibility mode, but the MetaOntology grammar and MCP tool contract stay the same.
+
 ---
 
 ## Architecture
+
+OpenCrab now ships with two storage realizations:
+
+- embedded local mode `(preferred)` using `LadybugDB + DuckDB + embedded ChromaDB`
+- legacy docker compatibility mode using `Neo4j + MongoDB + PostgreSQL + Chroma HTTP`
+
+The diagram below reflects the legacy compatibility topology. The MetaOntology
+grammar, validator behavior, and MCP tool contract stay the same across both.
 
 ```
                         ┌─────────────────────────────────────────────┐
@@ -80,40 +92,38 @@ policy     ──[permits, denies, requires_approval]─────────
 
 ## Quick Start
 
-### 1. Start the data services
-
-```bash
-docker-compose up -d
-```
-
-This starts Neo4j, MongoDB, PostgreSQL, and ChromaDB.
-
-### 2. Install OpenCrab
+### 1. Install OpenCrab
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-### 3. Configure environment
+### 2. Configure environment
 
 ```bash
 opencrab init          # creates .env from template
-# Edit .env if your credentials differ from defaults
+# Defaults to STORAGE_MODE=local
 ```
 
-### 4. Seed example data
-
-```bash
-python scripts/seed_ontology.py
-```
-
-### 5. Verify connectivity
+### 3. Verify the embedded runtime
 
 ```bash
 opencrab status
 ```
 
-### 6. Add to Claude Code MCP
+Local mode uses:
+
+- `LadybugDB` for graph traversal
+- `DuckDB` for docs, registry, policies, impacts, and simulations
+- embedded `ChromaDB PersistentClient` for vectors
+
+### 4. Seed example data / smoke the embedded path
+
+```bash
+python scripts/seed_ontology.py
+```
+
+### 5. Add to Claude Code MCP
 
 ```bash
 claude mcp add opencrab -- opencrab serve
@@ -121,18 +131,24 @@ claude mcp add opencrab -- opencrab serve
 
 Or add to your `.claude/mcp.json` manually (see below).
 
-### 7. Run a query
+### 6. Run a query
 
 ```bash
 opencrab query "system performance and error rates"
 opencrab manifest    # see the full grammar
 ```
 
-### Local vector mode
+### Legacy Docker compatibility mode
 
-When `STORAGE_MODE=local`, OpenCrab uses ChromaDB's embedded `PersistentClient`
-under `LOCAL_DATA_DIR/chroma`. No Chroma HTTP server is required for ingest/query
-in the embedded path.
+If you still need the old service topology:
+
+```bash
+docker compose up -d
+# set STORAGE_MODE=docker in .env
+```
+
+This starts Neo4j, MongoDB, PostgreSQL, and ChromaDB HTTP, but the grammar and
+MCP tool surface remain unchanged.
 
 ---
 
@@ -147,14 +163,8 @@ Add to `~/.claude/mcp.json` (or project-level `.mcp.json`):
       "command": "opencrab",
       "args": ["serve"],
       "env": {
-        "NEO4J_URI": "bolt://localhost:7687",
-        "NEO4J_USER": "neo4j",
-        "NEO4J_PASSWORD": "opencrab",
-        "MONGODB_URI": "mongodb://root:opencrab@localhost:27017",
-        "MONGODB_DB": "opencrab",
-        "POSTGRES_URL": "postgresql://opencrab:opencrab@localhost:5432/opencrab",
-        "CHROMA_HOST": "localhost",
-        "CHROMA_PORT": "8000"
+        "STORAGE_MODE": "local",
+        "LOCAL_DATA_DIR": "./opencrab_data"
       }
     }
   }
@@ -341,8 +351,8 @@ Every node and edge can carry orthogonal metadata attributes:
 
 ```bash
 make dev-install    # install with dev extras
-make up             # start docker services
-make seed           # seed example data
+make up             # start legacy docker compatibility services
+make seed           # seed embedded or docker runtime based on STORAGE_MODE
 make test           # run test suite
 make coverage       # test + coverage report
 make lint           # ruff linter
@@ -363,12 +373,12 @@ OPENCRAB_INTEGRATION=1 pytest tests/ -v
 ```
 opencrab/
 ├── grammar/          # MetaOntology grammar (manifest, validator, glossary)
-├── stores/           # Store adapters (Neo4j, ChromaDB, MongoDB, PostgreSQL)
+├── stores/           # Store adapters (LadybugDB, DuckDB, ChromaDB, legacy docker backends)
 ├── ontology/         # Ontology engine (builder, ReBAC, impact, query)
 └── mcp/              # MCP server (stdio JSON-RPC) and tool definitions
 tests/                # Test suite (grammar, stores, MCP tools)
 scripts/              # Seed script
-docker-compose.yml    # All data services
+docker-compose.yml    # Legacy compatibility services
 ```
 
 ---

@@ -74,12 +74,14 @@ def init(force: bool) -> None:
         Panel(
             "[bold]Next steps:[/bold]\n\n"
             "1. Edit [cyan].env[/cyan] with your credentials.\n"
-            "2. Start services:\n"
-            "   [cyan]docker-compose up -d[/cyan]\n"
-            "3. Add to Claude Code MCP config:\n"
+            "2. Verify the embedded runtime:\n"
+            "   [cyan]opencrab status[/cyan]\n"
+            "3. Seed the embedded stores:\n"
+            "   [cyan]python scripts/seed_ontology.py[/cyan]\n"
+            "4. Add to Claude Code MCP config:\n"
             "   [cyan]claude mcp add opencrab -- opencrab serve[/cyan]\n"
-            "4. Seed example data:\n"
-            "   [cyan]python scripts/seed_ontology.py[/cyan]",
+            "5. Optional legacy compatibility mode:\n"
+            "   [cyan]docker compose up -d[/cyan] and set [cyan]STORAGE_MODE=docker[/cyan]",
             title="OpenCrab Setup",
             border_style="green",
         )
@@ -145,17 +147,16 @@ def status() -> None:
 
     graph  = make_graph_store(cfg)
     vector = make_vector_store(cfg)
-    docs   = make_doc_store(cfg)
     sql    = make_sql_store(cfg)
 
     if cfg.is_local:
         store_rows: list[tuple[str, str, Any]] = [
             ("Graph (LadybugDB)", cfg.local_data_dir + "/graph.lbug",  graph),
             ("Vector (ChromaDB Embedded)", getattr(vector, "location", cfg.local_data_dir + "/chroma"), vector),
-            ("Docs (JSON files)", cfg.local_data_dir + "/docs",        docs),
-            ("SQL (SQLite)",      cfg.local_data_dir + "/opencrab.db", sql),
+            ("Operational Store (DuckDB)", cfg.local_data_dir + "/opencrab.db", sql),
         ]
     else:
+        docs = make_doc_store(cfg)
         store_rows = [
             ("Graph (Neo4j)",     cfg.neo4j_uri,                      graph),
             ("Docs (MongoDB)",    cfg.mongodb_uri.split("@")[-1],     docs),

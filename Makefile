@@ -10,12 +10,12 @@ help:
 	@echo "Usage:"
 	@echo "  make install       Install package"
 	@echo "  make dev-install   Install with dev extras"
-	@echo "  make up            Start all Docker services"
-	@echo "  make down          Stop all Docker services"
+	@echo "  make up            Start legacy Docker compatibility services"
+	@echo "  make down          Stop legacy Docker compatibility services"
 	@echo "  make status        Check store connections"
 	@echo "  make serve         Start MCP server on stdio"
 	@echo "  make manifest      Print MetaOntology grammar"
-	@echo "  make seed          Seed databases with example data"
+	@echo "  make seed          Seed embedded or docker runtime based on STORAGE_MODE"
 	@echo "  make lint          Run ruff linter"
 	@echo "  make format        Run black + isort"
 	@echo "  make test          Run test suite"
@@ -28,11 +28,11 @@ dev-install:
 	$(PIP) install -e ".[dev]"
 
 up:
-	docker-compose up -d
-	@echo "Services starting... run 'make status' to check readiness."
+	docker compose up -d
+	@echo "Legacy services starting... set STORAGE_MODE=docker if you want to use them."
 
 down:
-	docker-compose down
+	docker compose down
 
 status:
 	$(PYTHON) -m opencrab.cli status
