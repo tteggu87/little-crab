@@ -18,6 +18,20 @@ if TYPE_CHECKING:
     from opencrab.config import Settings
 
 
+_LOCAL_DUCKDB_STORES: dict[str, Any] = {}
+
+
+def _make_local_duckdb_store(settings: Settings) -> Any:
+    from opencrab.stores.duckdb_store import DuckDBStore
+
+    db_path = os.path.join(settings.local_data_dir, "opencrab.db")
+    store = _LOCAL_DUCKDB_STORES.get(db_path)
+    if store is None:
+        store = DuckDBStore(path=db_path)
+        _LOCAL_DUCKDB_STORES[db_path] = store
+    return store
+
+
 def make_graph_store(settings: Settings) -> Any:
     """Return LocalGraphStore (local) or Neo4jStore (docker)."""
     if settings.is_local:
@@ -50,12 +64,9 @@ def make_vector_store(settings: Settings) -> Any:
 
 
 def make_doc_store(settings: Settings) -> Any:
-    """Return LocalDocStore (local) or MongoStore (docker)."""
+    """Return DuckDBStore (local) or MongoStore (docker)."""
     if settings.is_local:
-        from opencrab.stores.local_doc_store import LocalDocStore
-
-        docs_path = os.path.join(settings.local_data_dir, "docs")
-        return LocalDocStore(data_dir=docs_path)
+        return _make_local_duckdb_store(settings)
     else:
         from opencrab.stores.mongo_store import MongoStore
 
@@ -63,8 +74,10 @@ def make_doc_store(settings: Settings) -> Any:
 
 
 def make_sql_store(settings: Settings) -> Any:
-    """Return SQLStore with SQLite (local) or PostgreSQL (docker)."""
+    """Return DuckDBStore (local) or SQLStore (docker)."""
+    if settings.is_local:
+        return _make_local_duckdb_store(settings)
+
     from opencrab.stores.sql_store import SQLStore
 
-    url = settings.sqlite_url if settings.is_local else settings.postgres_url
-    return SQLStore(url=url)
+    return SQLStore(url=settings.postgres_url)

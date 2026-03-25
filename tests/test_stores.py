@@ -200,6 +200,75 @@ class TestLocalDocStoreUnit:
 
 
 # ---------------------------------------------------------------------------
+# DuckDB store unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestDuckDBStoreUnit:
+    @pytest.fixture
+    def store(self, tmp_path):
+        from opencrab.stores.duckdb_store import DuckDBStore
+
+        return DuckDBStore(str(tmp_path / "opencrab.db"))
+
+    def test_connects_with_local_file(self, store):
+        assert store.available is True
+        assert store.ping() is True
+
+    def test_upsert_node_doc_and_audit_log(self, store):
+        doc_id = store.upsert_node_doc("subject", "User", "u1", {"name": "Alice"})
+        assert doc_id == "subject::u1"
+
+        doc = store.get_node_doc("subject", "u1")
+        assert doc is not None
+        assert doc["properties"]["name"] == "Alice"
+
+        store.log_event("node_upsert", subject_id=None, details={"node_id": "u1"})
+        events = store.get_audit_log()
+        assert len(events) == 1
+        assert events[0]["event_type"] == "node_upsert"
+
+    def test_upsert_source_and_retrieve(self, store):
+        source_id = store.upsert_source("src-1", "hello world", {"space": "evidence"})
+        assert source_id == "src-1"
+
+        source = store.get_source("src-1")
+        assert source is not None
+        assert source["text"] == "hello world"
+        assert source["metadata"]["space"] == "evidence"
+
+    def test_register_policy_and_analysis_records(self, store):
+        store.register_node("subject", "User", "u1")
+        store.register_edge("subject", "u1", "owns", "resource", "r1")
+
+        store.set_policy("u1", "view", "r1", granted=True)
+        assert store.check_policy("u1", "view", "r1") is True
+
+        impact_id = store.save_impact("u1", "update", {"ok": True})
+        sim_id = store.save_simulation("lever-1", "raises", 0.4, {"ok": True})
+        assert impact_id >= 1
+        assert sim_id >= 1
+
+        impacts = store.get_impacts("u1")
+        assert len(impacts) == 1
+        assert impacts[0]["impact"]["ok"] is True
+
+    def test_table_counts_include_document_and_registry_tables(self, store):
+        store.upsert_node_doc("subject", "User", "u1", {"name": "Alice"})
+        store.upsert_source("src-1", "hello world", {})
+        store.log_event("node_upsert", {"node_id": "u1"})
+        store.register_node("subject", "User", "u1")
+        store.set_policy("u1", "view", "r1", granted=True)
+
+        counts = store.table_counts()
+        assert counts["node_documents"] == 1
+        assert counts["source_documents"] == 1
+        assert counts["audit_log"] == 1
+        assert counts["ontology_nodes"] == 1
+        assert counts["rebac_policies"] == 1
+
+
+# ---------------------------------------------------------------------------
 # SQL store unit tests (uses SQLite in-memory)
 # ---------------------------------------------------------------------------
 
@@ -286,6 +355,58 @@ class TestSQLStoreUnit:
         assert isinstance(counts, dict)
         assert "ontology_nodes" in counts
         assert "rebac_policies" in counts
+
+
+class TestLocalFactoryDuckDB:
+    def test_local_factory_returns_duckdb_store_for_doc_and_sql(self, tmp_path):
+        from opencrab.config import Settings
+        from opencrab.stores.duckdb_store import DuckDBStore
+        from opencrab.stores.factory import make_doc_store, make_sql_store
+
+        settings = Settings(STORAGE_MODE="local", LOCAL_DATA_DIR=str(tmp_path))
+
+        docs = make_doc_store(settings)
+        sql = make_sql_store(settings)
+
+        assert isinstance(docs, DuckDBStore)
+        assert isinstance(sql, DuckDBStore)
+        assert docs is sql
+
+
+class TestDuckDBBackedRuntime:
+    def test_builder_persists_docs_registry_and_audit_without_mongo_postgres(self, tmp_path):
+        from opencrab.ontology.builder import OntologyBuilder
+        from opencrab.stores.duckdb_store import DuckDBStore
+        from opencrab.stores.neo4j_store import Neo4jStore
+
+        graph = Neo4jStore("bolt://invalid:7687", "neo4j", "pw")
+        store = DuckDBStore(str(tmp_path / "opencrab.db"))
+        builder = OntologyBuilder(graph, store, store)
+
+        result = builder.add_node("subject", "User", "u1", {"name": "Alice"})
+
+        assert result["stores"]["mongodb"].startswith("ok")
+        assert result["stores"]["postgres"] == "ok"
+        assert store.get_node_doc("subject", "u1") is not None
+        assert store.table_counts()["ontology_nodes"] == 1
+        assert len(store.get_audit_log()) == 1
+
+    def test_rebac_and_impact_persist_through_duckdb_store(self, tmp_path):
+        from opencrab.ontology.impact import ImpactEngine
+        from opencrab.ontology.rebac import ReBACEngine
+        from opencrab.stores.duckdb_store import DuckDBStore
+        from opencrab.stores.neo4j_store import Neo4jStore
+
+        graph = Neo4jStore("bolt://invalid:7687", "neo4j", "pw")
+        store = DuckDBStore(str(tmp_path / "opencrab.db"))
+
+        rebac = ReBACEngine(graph, store)
+        rebac.grant("u1", "view", "doc1")
+        assert rebac.check("u1", "view", "doc1").granted is True
+
+        impact = ImpactEngine(graph, store)
+        impact.analyse("u1", "update")
+        assert len(store.get_impacts("u1")) == 1
 
     def test_unavailable_store_raises(self):
         from opencrab.stores.sql_store import SQLStore
