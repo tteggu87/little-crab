@@ -65,6 +65,82 @@ class TestNeo4jStoreUnit:
 
 
 # ---------------------------------------------------------------------------
+# LadybugDB store unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestLadybugStoreUnit:
+    @pytest.fixture
+    def store(self, tmp_path):
+        from opencrab.stores.ladybug_store import LadybugStore
+
+        return LadybugStore(str(tmp_path / "graph.lbug"))
+
+    def test_upsert_node_and_runtime_lookup(self, store):
+        store.upsert_node("User", "u1", {"name": "Alice"}, space_id="subject")
+
+        rows = store.run_cypher(
+            "MATCH (n {id: $id}) RETURN labels(n)[0] AS lbl, n.space AS space LIMIT 1",
+            {"id": "u1"},
+        )
+
+        assert rows == [{"lbl": "User", "space": "subject"}]
+
+    def test_upsert_edge_neighbors_and_path(self, store):
+        store.upsert_node("User", "u1", {"name": "Alice"}, space_id="subject")
+        store.upsert_node("Team", "t1", {"name": "Data Team"}, space_id="subject")
+        store.upsert_node("Project", "p1", {"name": "Project"}, space_id="resource")
+
+        assert store.upsert_edge("User", "u1", "member_of", "Team", "t1") is True
+        assert store.upsert_edge("Team", "t1", "can_view", "Project", "p1") is True
+
+        neighbors = store.find_neighbors("u1", direction="both", depth=2, limit=10)
+        neighbor_ids = {n["properties"]["id"] for n in neighbors}
+        assert "t1" in neighbor_ids
+        assert "p1" in neighbor_ids
+
+        path = store.find_path("u1", "p1", max_depth=3)
+        assert len(path) == 2
+        assert path[-1]["node"]["id"] == "p1"
+
+    def test_runtime_queries_for_rebac_and_lever_paths(self, store):
+        store.upsert_node("User", "u1", {"name": "Alice"}, space_id="subject")
+        store.upsert_node("Team", "t1", {"name": "Data Team"}, space_id="subject")
+        store.upsert_node("Project", "p1", {"name": "Project"}, space_id="resource")
+        store.upsert_node("Lever", "l1", {"name": "Cache TTL"}, space_id="lever")
+        store.upsert_node("Outcome", "o1", {"name": "Reliability"}, space_id="outcome")
+        store.upsert_node("Concept", "c1", {"name": "Performance"}, space_id="concept")
+
+        store.upsert_edge("User", "u1", "member_of", "Team", "t1")
+        store.upsert_edge("Team", "t1", "can_view", "Project", "p1")
+        store.upsert_edge("Lever", "l1", "raises", "Outcome", "o1")
+        store.upsert_edge("Lever", "l1", "affects", "Concept", "c1")
+
+        transitive = store.run_cypher(
+            """
+            MATCH (s {id: $sid})-[:member_of|manages]->(group)-[r:can_view|can_edit|can_approve|owns|manages]->(res {id: $rid})
+            RETURN type(r) AS rel_type, properties(group).id AS group_id
+            LIMIT 1
+            """,
+            {"sid": "u1", "rid": "p1"},
+        )
+        assert transitive[0]["rel_type"] == "can_view"
+        assert transitive[0]["group_id"] == "t1"
+
+        lever_rows = store.run_cypher(
+            """
+            MATCH (l {id: $lid})-[r:raises|lowers|stabilizes|optimizes]->(o)
+            RETURN properties(o) AS oProps, type(r) AS rType, labels(o)[0] AS oLabel
+            LIMIT 20
+            """,
+            {"lid": "l1"},
+        )
+        assert lever_rows[0]["rType"] == "raises"
+        assert lever_rows[0]["oProps"]["id"] == "o1"
+        assert lever_rows[0]["oLabel"] == "Outcome"
+
+
+# ---------------------------------------------------------------------------
 # ChromaDB store unit tests
 # ---------------------------------------------------------------------------
 
@@ -384,6 +460,17 @@ class TestLocalFactoryDuckDB:
         assert isinstance(sql, DuckDBStore)
         assert docs is sql
 
+    def test_local_factory_returns_ladybug_graph_store(self, tmp_path):
+        from opencrab.config import Settings
+        from opencrab.stores.factory import make_graph_store
+        from opencrab.stores.ladybug_store import LadybugStore
+
+        settings = Settings(STORAGE_MODE="local", LOCAL_DATA_DIR=str(tmp_path))
+        graph = make_graph_store(settings)
+
+        assert isinstance(graph, LadybugStore)
+        assert graph.available is True
+
 
 class TestDuckDBBackedRuntime:
     def test_builder_persists_docs_registry_and_audit_without_mongo_postgres(self, tmp_path):
@@ -419,6 +506,54 @@ class TestDuckDBBackedRuntime:
         impact = ImpactEngine(graph, store)
         impact.analyse("u1", "update")
         assert len(store.get_impacts("u1")) == 1
+
+
+class TestLadybugBackedRuntime:
+    def test_rebac_impact_and_keyword_query_work_without_neo4j(self, tmp_path):
+        from opencrab.ontology.impact import ImpactEngine
+        from opencrab.ontology.query import HybridQuery
+        from opencrab.ontology.rebac import ReBACEngine
+        from opencrab.stores.chroma_store import ChromaStore
+        from opencrab.stores.duckdb_store import DuckDBStore
+        from opencrab.stores.ladybug_store import LadybugStore
+
+        graph = LadybugStore(str(tmp_path / "graph.lbug"))
+        sql = DuckDBStore(str(tmp_path / "opencrab.db"))
+        vector = ChromaStore(
+            host="localhost",
+            port=8000,
+            collection_name="test_opencrab_vectors",
+            local_mode=True,
+            local_path=str(tmp_path / "chroma"),
+        )
+
+        graph.upsert_node("User", "u1", {"name": "Alice Analyst"}, space_id="subject")
+        graph.upsert_node("Team", "t1", {"name": "Data Team"}, space_id="subject")
+        graph.upsert_node("Project", "p1", {"name": "Analytics Project"}, space_id="resource")
+        graph.upsert_node("Lever", "l1", {"name": "Cache TTL"}, space_id="lever")
+        graph.upsert_node("Outcome", "o1", {"name": "Reliability"}, space_id="outcome")
+
+        graph.upsert_edge("User", "u1", "member_of", "Team", "t1")
+        graph.upsert_edge("Team", "t1", "can_view", "Project", "p1")
+        graph.upsert_edge("Lever", "l1", "raises", "Outcome", "o1")
+
+        rebac = ReBACEngine(graph, sql)
+        decision = rebac.check("u1", "view", "p1")
+        assert decision.granted is True
+        assert "Transitive access" in decision.reason
+
+        impact = ImpactEngine(graph, sql)
+        result = impact.analyse("l1", "update")
+        assert result.space == "lever"
+        assert len(sql.get_impacts("l1")) == 1
+
+        hybrid = HybridQuery(vector, graph)
+        keyword_results = hybrid.keyword_search("analytics", spaces=["resource"], limit=5)
+        assert len(keyword_results) == 1
+        assert keyword_results[0]["node"]["id"] == "p1"
+
+
+class TestUnavailableSQLStore:
 
     def test_unavailable_store_raises(self):
         from opencrab.stores.sql_store import SQLStore

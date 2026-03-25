@@ -33,12 +33,12 @@ def _make_local_duckdb_store(settings: Settings) -> Any:
 
 
 def make_graph_store(settings: Settings) -> Any:
-    """Return LocalGraphStore (local) or Neo4jStore (docker)."""
+    """Return LadybugStore (local) or Neo4jStore (docker)."""
     if settings.is_local:
-        from opencrab.stores.local_graph_store import LocalGraphStore
+        from opencrab.stores.ladybug_store import LadybugStore
 
-        db_path = os.path.join(settings.local_data_dir, "graph.db")
-        return LocalGraphStore(db_path=db_path)
+        db_path = os.path.join(settings.local_data_dir, "graph.lbug")
+        return LadybugStore(db_path=db_path)
     else:
         from opencrab.stores.neo4j_store import Neo4jStore
 

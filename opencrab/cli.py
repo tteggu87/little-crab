@@ -150,7 +150,7 @@ def status() -> None:
 
     if cfg.is_local:
         store_rows: list[tuple[str, str, Any]] = [
-            ("Graph (SQLite)",    cfg.local_data_dir + "/graph.db",    graph),
+            ("Graph (LadybugDB)", cfg.local_data_dir + "/graph.lbug",  graph),
             ("Vector (ChromaDB Embedded)", getattr(vector, "location", cfg.local_data_dir + "/chroma"), vector),
             ("Docs (JSON files)", cfg.local_data_dir + "/docs",        docs),
             ("SQL (SQLite)",      cfg.local_data_dir + "/opencrab.db", sql),
