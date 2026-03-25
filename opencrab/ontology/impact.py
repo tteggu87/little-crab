@@ -22,8 +22,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from opencrab.grammar.manifest import IMPACT_CATEGORIES, space_for_node_type
-from opencrab.stores.neo4j_store import Neo4jStore
-from opencrab.stores.sql_store import SQLStore
+from opencrab.stores.contracts import AnalysisStore, GraphStore
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +81,7 @@ _CHANGE_TYPE_IMPACTS: dict[str, list[str]] = {
 class ImpactEngine:
     """Analyses the blast radius of ontology changes."""
 
-    def __init__(self, neo4j: Neo4jStore, sql: SQLStore) -> None:
+    def __init__(self, neo4j: GraphStore, sql: AnalysisStore) -> None:
         self._neo4j = neo4j
         self._sql = sql
 

@@ -20,8 +20,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from opencrab.grammar.validator import validate_rebac_permission
-from opencrab.stores.neo4j_store import Neo4jStore
-from opencrab.stores.sql_store import SQLStore
+from opencrab.stores.contracts import GraphStore, PolicyStore
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,7 @@ class AccessDecision:
 class ReBACEngine:
     """Relationship-based access control engine."""
 
-    def __init__(self, neo4j: Neo4jStore, sql: SQLStore) -> None:
+    def __init__(self, neo4j: GraphStore, sql: PolicyStore) -> None:
         self._neo4j = neo4j
         self._sql = sql
 

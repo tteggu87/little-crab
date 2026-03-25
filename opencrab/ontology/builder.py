@@ -14,9 +14,7 @@ import logging
 from typing import Any
 
 from opencrab.grammar.validator import validate_edge, validate_node
-from opencrab.stores.mongo_store import MongoStore
-from opencrab.stores.neo4j_store import Neo4jStore
-from opencrab.stores.sql_store import SQLStore
+from opencrab.stores.contracts import DocumentEventStore, GraphStore, RegistryStore
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +24,9 @@ class OntologyBuilder:
 
     def __init__(
         self,
-        neo4j: Neo4jStore,
-        mongo: MongoStore,
-        sql: SQLStore,
+        neo4j: GraphStore,
+        mongo: DocumentEventStore,
+        sql: RegistryStore,
     ) -> None:
         self._neo4j = neo4j
         self._mongo = mongo

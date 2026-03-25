@@ -165,6 +165,41 @@ class TestMongoStoreUnit:
 
 
 # ---------------------------------------------------------------------------
+# Local document store unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestLocalDocStoreUnit:
+    @pytest.fixture
+    def store(self, tmp_path):
+        from opencrab.stores.local_doc_store import LocalDocStore
+
+        return LocalDocStore(str(tmp_path / "docs"))
+
+    def test_upsert_node_doc_builder_compat(self, store):
+        doc_id = store.upsert_node_doc("subject", "User", "u1", {"name": "Alice"})
+        assert doc_id == "subject::u1"
+
+        doc = store.get_node_doc("subject", "u1")
+        assert doc is not None
+        assert doc["node_type"] == "User"
+        assert doc["properties"]["name"] == "Alice"
+
+    def test_log_event_accepts_builder_signature(self, store):
+        store.log_event("node_upsert", subject_id=None, details={"node_id": "u1"})
+        events = store.get_audit_log()
+        assert len(events) == 1
+        assert events[0]["event_type"] == "node_upsert"
+        assert events[0]["details"]["node_id"] == "u1"
+
+    def test_log_event_accepts_payload_shortcut(self, store):
+        store.log_event("edge_upsert", {"from_id": "u1", "to_id": "p1"})
+        events = store.get_audit_log()
+        assert len(events) == 1
+        assert events[0]["details"]["from_id"] == "u1"
+
+
+# ---------------------------------------------------------------------------
 # SQL store unit tests (uses SQLite in-memory)
 # ---------------------------------------------------------------------------
 

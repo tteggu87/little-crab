@@ -77,9 +77,24 @@ class LocalDocStore:
             }
             self._save("nodes", data)
 
+    def upsert_node_doc(
+        self,
+        space: str,
+        node_type: str,
+        node_id: str,
+        properties: dict[str, Any],
+    ) -> str:
+        """MongoStore-compatible node upsert path used by the builder."""
+        self.upsert_node(space, node_type, node_id, properties)
+        return f"{space}::{node_id}"
+
     def get_node(self, space: str, node_id: str) -> dict[str, Any] | None:
         data = self._load("nodes")
         return data.get(f"{space}::{node_id}")
+
+    def get_node_doc(self, space: str, node_id: str) -> dict[str, Any] | None:
+        """MongoStore-compatible node retrieval helper."""
+        return self.get_node(space, node_id)
 
     def list_nodes(self, space: str | None = None) -> list[dict[str, Any]]:
         data = self._load("nodes")
@@ -118,9 +133,14 @@ class LocalDocStore:
     def log_event(
         self,
         event_type: str,
-        payload: dict[str, Any],
+        subject_id: str | dict[str, Any] | None = None,
+        details: dict[str, Any] | None = None,
         actor: str = "system",
     ) -> None:
+        if isinstance(subject_id, dict) and details is None:
+            details = subject_id
+            subject_id = None
+
         with self._lock:
             data = self._load("audit_log")
             ts = datetime.now(UTC).isoformat()
@@ -128,7 +148,8 @@ class LocalDocStore:
             data[entry_id] = {
                 "event_type": event_type,
                 "actor": actor,
-                "payload": payload,
+                "subject_id": subject_id,
+                "details": details or {},
                 "timestamp": ts,
             }
             self._save("audit_log", data)

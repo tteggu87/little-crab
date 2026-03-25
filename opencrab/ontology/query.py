@@ -18,8 +18,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from opencrab.stores.chroma_store import ChromaStore
-from opencrab.stores.neo4j_store import Neo4jStore
+from opencrab.stores.contracts import GraphStore, VectorStore
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ class QueryResult:
 class HybridQuery:
     """Orchestrates hybrid vector + graph queries."""
 
-    def __init__(self, chroma: ChromaStore, neo4j: Neo4jStore) -> None:
+    def __init__(self, chroma: VectorStore, neo4j: GraphStore) -> None:
         self._chroma = chroma
         self._neo4j = neo4j
 
