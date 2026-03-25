@@ -1,5 +1,5 @@
 """
-MCP Tool Definitions for OpenCrab.
+MCP Tool Definitions for little-crab.
 
 Each tool is a plain function that accepts keyword arguments and returns
 a JSON-serialisable dict. The TOOLS registry maps tool names to their
@@ -34,7 +34,7 @@ _context: dict[str, Any] = {}
 
 
 def _get_context() -> dict[str, Any]:
-    """Lazily initialise all stores and engines using the factory (respects STORAGE_MODE)."""
+    """Lazily initialise the local embedded stores and ontology engines."""
     global _context
     if _context:
         return _context
@@ -304,10 +304,10 @@ def ontology_extract(
     model: str = "claude-haiku-4-5-20251001",
 ) -> dict[str, Any]:
     """
-    LLM-extract ontology nodes and edges from text and write to the graph.
+    Extract ontology nodes and edges from text and write them to the graph.
 
-    Uses Claude to identify entities and relationships according to the
-    9-Space MetaOntology grammar, then persists them.
+    little-crab currently uses a conservative local heuristic extractor that
+    keeps the MCP surface available without requiring an external LLM service.
 
     Parameters
     ----------
@@ -318,18 +318,12 @@ def ontology_extract(
     model:
         Claude model to use for extraction.
     """
-    import os
-
     from opencrab.ontology.extractor import LLMExtractor
-
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        return {"error": "ANTHROPIC_API_KEY not set"}
 
     ctx = _get_context()
 
     try:
-        extractor = LLMExtractor(api_key=api_key, model=model)
+        extractor = LLMExtractor(model=model)
         result = extractor.extract_from_text(text, source_id=source_id)
 
         added_nodes = 0
@@ -365,6 +359,7 @@ def ontology_extract(
 
         return {
             "source_id": source_id,
+            "extractor_mode": result.mode,
             "extracted_nodes": len(result.nodes),
             "extracted_edges": len(result.edges),
             "added_nodes": added_nodes,
@@ -387,7 +382,7 @@ def ontology_ingest(
     Ingest a text document into the vector store.
 
     The text is embedded and stored in ChromaDB. A source record is
-    also created in MongoDB if available.
+    also created in the embedded document store when available.
 
     Parameters
     ----------
@@ -411,7 +406,7 @@ def ontology_ingest(
     except Exception as exc:
         result["stores"]["chromadb"] = f"error: {exc}"
 
-    # Ingest into MongoDB
+    # Ingest into the document store
     mongo: Any = ctx["mongo"]
     if mongo.available:
         try:
@@ -556,8 +551,8 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "ontology_extract": {
         "description": (
-            "LLM-extract ontology nodes and edges from text using Claude, "
-            "then persist them into the knowledge graph."
+            "Extract ontology nodes and edges from text with the local heuristic "
+            "extractor, then persist them into the knowledge graph."
         ),
         "inputSchema": {
             "type": "object",

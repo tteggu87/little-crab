@@ -8,3 +8,4 @@ __pycache__/
 .env
 opencrab_data/
 opencrab_data_*/
+little_crab_smoke/

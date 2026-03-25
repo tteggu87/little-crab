@@ -1,296 +1,111 @@
-<p align="center">
-  <img src="logo.png" alt="OpenCrab Logo" width="260"/>
-</p>
+# little-crab
 
-# OpenCrab
+Local-first fork of OpenCrab.
 
-**MetaOntology OS MCP Server Plugin**
+little-crab keeps the original MetaOntology grammar, validator behavior, MCP tool surface, and agentic ontology loop, but removes the legacy service stack. The runtime is now embedded only:
 
-> Carcinization is the evolutionary tendency for crustaceans to converge on a crab-like body plan.
-> OpenCrab applies the same principle to agent environments:
-> all sufficiently advanced AI systems eventually evolve toward ontology-structured forms.
+- `LadybugDB` for graph traversal
+- `DuckDB` for documents, audit events, registry, policies, impacts, and simulations
+- embedded `ChromaDB` for vectors
 
-OpenCrab is an MCP (Model Context Protocol) server that exposes the MetaOntology OS grammar
-to any OpenClaw-compatible agent environment — Claude Code, n8n, LangGraph, and beyond.
-
-Preferred runtime path: embedded local mode with `LadybugDB + DuckDB + embedded ChromaDB`.
-The legacy `Neo4j + MongoDB + PostgreSQL + Chroma HTTP` stack remains available as a
-compatibility mode, but the MetaOntology grammar and MCP tool contract stay the same.
+The Python package name is `little-crab`. The CLI exposes both `little-crab` and `opencrab` entrypoints for compatibility.
 
 ---
 
-## Architecture
+## What Stays the Same
 
-OpenCrab now ships with two storage realizations:
+- 9-space MetaOntology grammar
+- grammar validation rules
+- MCP tool names:
+  - `ontology_manifest`
+  - `ontology_add_node`
+  - `ontology_add_edge`
+  - `ontology_query`
+  - `ontology_impact`
+  - `ontology_rebac_check`
+  - `ontology_lever_simulate`
+  - `ontology_extract`
+  - `ontology_ingest`
+- guided, partial-knowledge ontology workflow for agent use
 
-- embedded local mode `(preferred)` using `LadybugDB + DuckDB + embedded ChromaDB`
-- legacy docker compatibility mode using `Neo4j + MongoDB + PostgreSQL + Chroma HTTP`
+## What Changed
 
-The diagram below reflects the legacy compatibility topology. The MetaOntology
-grammar, validator behavior, and MCP tool contract stay the same across both.
-
-```
-                        ┌─────────────────────────────────────────────┐
-                        │           OpenCrab MCP Server               │
-                        │              (stdio JSON-RPC)               │
-                        └──────────────────┬──────────────────────────┘
-                                           │
-              ┌────────────────────────────┼────────────────────────────┐
-              │                           │                            │
-      ┌───────▼──────┐           ┌────────▼───────┐          ┌────────▼───────┐
-      │  grammar/    │           │   ontology/    │          │    stores/     │
-      │  manifest.py │           │   builder.py   │          │                │
-      │  validator.py│           │   rebac.py     │          │  neo4j_store   │
-      │  glossary.py │           │   impact.py    │          │  chroma_store  │
-      └──────────────┘           │   query.py     │          │  mongo_store   │
-                                 └────────────────┘          │  sql_store     │
-                                                             └───────┬────────┘
-                                                                     │
-                              ┌──────────────────────────────────────┤
-                              │              Data Layer              │
-              ┌───────────────┼───────────────┬──────────────────────┤
-              │               │               │                      │
-      ┌───────▼──────┐ ┌──────▼──────┐ ┌─────▼──────┐ ┌────────────▼───┐
-      │    Neo4j     │ │  ChromaDB   │ │  MongoDB   │ │  PostgreSQL    │
-      │  (graph)     │ │  (vectors)  │ │ (documents)│ │  (registry +   │
-      │  Cypher      │ │  semantic   │ │  audit log │ │   ReBAC policy)│
-      │  traversal   │ │  search     │ │            │ │                │
-      └──────────────┘ └─────────────┘ └────────────┘ └────────────────┘
-```
-
-### MetaOntology OS — 9 Spaces
-
-| Space      | Node Types                                  | Role                              |
-|------------|---------------------------------------------|-----------------------------------|
-| subject    | User, Team, Org, Agent                      | Actors with identity and agency   |
-| resource   | Project, Document, File, Dataset, Tool, API | Artifacts that subjects act upon  |
-| evidence   | TextUnit, LogEntry, Evidence                | Raw empirical observations        |
-| concept    | Entity, Concept, Topic, Class               | Abstract knowledge                |
-| claim      | Claim, Covariate                            | Derived assertions                |
-| community  | Community, CommunityReport                  | Concept clusters                  |
-| outcome    | Outcome, KPI, Risk                          | Measurable results                |
-| lever      | Lever                                       | Tunable control variables         |
-| policy     | Policy, Sensitivity, ApprovalRule           | Governance rules                  |
-
-### MetaEdge Relationship Grammar
-
-```
-subject    ──[owns, manages, can_view, can_edit, can_execute, can_approve]──► resource
-resource   ──[contains, derived_from, logged_as]──────────────────────────► evidence
-evidence   ──[mentions, describes, exemplifies]────────────────────────────► concept
-evidence   ──[supports, contradicts, timestamps]───────────────────────────► claim
-concept    ──[related_to, subclass_of, part_of, influences, depends_on]────► concept
-concept    ──[contributes_to, constrains, predicts, degrades]──────────────► outcome
-lever      ──[raises, lowers, stabilizes, optimizes]───────────────────────► outcome
-lever      ──[affects]─────────────────────────────────────────────────────► concept
-community  ──[clusters, summarizes]────────────────────────────────────────► concept
-policy     ──[protects, classifies, restricts]─────────────────────────────► resource
-policy     ──[permits, denies, requires_approval]──────────────────────────► subject
-```
+- no Docker requirement
+- no Neo4j, MongoDB, or PostgreSQL dependency
+- local-first runtime only
 
 ---
 
 ## Quick Start
 
-### 1. Install OpenCrab
+### 1. Install
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-### 2. Configure environment
+### 2. Initialize local config
 
 ```bash
-opencrab init          # creates .env from template
-# Defaults to STORAGE_MODE=local
+little-crab init
 ```
 
-### 3. Verify the embedded runtime
+This creates `.env` with:
+
+```env
+STORAGE_MODE=local
+LOCAL_DATA_DIR=./opencrab_data
+CHROMA_COLLECTION=little_crab_vectors
+MCP_SERVER_NAME=little-crab
+MCP_SERVER_VERSION=0.1.0
+LOG_LEVEL=INFO
+```
+
+### 3. Check embedded stores
 
 ```bash
-opencrab status
+little-crab status
 ```
 
-Local mode uses:
-
-- `LadybugDB` for graph traversal
-- `DuckDB` for docs, registry, policies, impacts, and simulations
-- embedded `ChromaDB PersistentClient` for vectors
-
-### 4. Seed example data / smoke the embedded path
+### 4. Seed example data
 
 ```bash
 python scripts/seed_ontology.py
 ```
 
-### 5. Add to Claude Code MCP
+### 5. Run a query
 
 ```bash
-claude mcp add opencrab -- opencrab serve
+little-crab query "system performance and error rates"
+little-crab manifest
 ```
 
-Or add to your `.claude/mcp.json` manually (see below).
-
-### 6. Run a query
+### 6. Connect as an MCP server
 
 ```bash
-opencrab query "system performance and error rates"
-opencrab manifest    # see the full grammar
+claude mcp add little-crab -- little-crab serve
 ```
 
-### Legacy Docker compatibility mode
-
-If you still need the old service topology:
+You can also keep using the compatibility alias:
 
 ```bash
-docker compose up -d
-# set STORAGE_MODE=docker in .env
+claude mcp add little-crab -- opencrab serve
 ```
-
-This starts Neo4j, MongoDB, PostgreSQL, and ChromaDB HTTP, but the grammar and
-MCP tool surface remain unchanged.
 
 ---
 
 ## Claude Code MCP Configuration
 
-Add to `~/.claude/mcp.json` (or project-level `.mcp.json`):
-
 ```json
 {
   "mcpServers": {
-    "opencrab": {
-      "command": "opencrab",
+    "little-crab": {
+      "command": "little-crab",
       "args": ["serve"],
       "env": {
-        "STORAGE_MODE": "local",
         "LOCAL_DATA_DIR": "./opencrab_data"
       }
     }
-  }
-}
-```
-
-Alternatively, with `uvx` (no install required):
-
-```json
-{
-  "mcpServers": {
-    "opencrab": {
-      "command": "uvx",
-      "args": ["--from", "opencrab", "opencrab", "serve"]
-    }
-  }
-}
-```
-
----
-
-## MCP Tool Reference
-
-### `ontology_manifest`
-
-Returns the full MetaOntology grammar: spaces, meta-edges, impact categories,
-active metadata layers, and ReBAC configuration.
-
-```json
-{}
-```
-
-### `ontology_add_node`
-
-Add or update a node in the ontology.
-
-```json
-{
-  "space": "subject",
-  "node_type": "User",
-  "node_id": "user-alice",
-  "properties": {
-    "name": "Alice Chen",
-    "role": "analyst"
-  }
-}
-```
-
-### `ontology_add_edge`
-
-Add a directed edge (grammar-validated before write).
-
-```json
-{
-  "from_space": "subject",
-  "from_id": "user-alice",
-  "relation": "owns",
-  "to_space": "resource",
-  "to_id": "doc-spec"
-}
-```
-
-Returns a validation error if the relation is not valid for the given space pair.
-
-### `ontology_query`
-
-Hybrid vector + graph search.
-
-```json
-{
-  "question": "What factors degrade system performance?",
-  "spaces": ["concept", "outcome"],
-  "limit": 10
-}
-```
-
-### `ontology_impact`
-
-Impact analysis: which I1–I7 categories are triggered by a change?
-
-```json
-{
-  "node_id": "lever-cache-ttl",
-  "change_type": "update"
-}
-```
-
-Returns triggered impact categories, affected neighbouring nodes, and a summary.
-
-### `ontology_rebac_check`
-
-Relationship-based access control check.
-
-```json
-{
-  "subject_id": "user-alice",
-  "permission": "edit",
-  "resource_id": "ds-events"
-}
-```
-
-Returns `{ "granted": true/false, "reason": "...", "path": [...] }`.
-
-### `ontology_lever_simulate`
-
-Predict downstream outcome changes from a lever movement.
-
-```json
-{
-  "lever_id": "lever-cache-ttl",
-  "direction": "lowers",
-  "magnitude": 0.7
-}
-```
-
-### `ontology_ingest`
-
-Ingest text into the vector and document stores.
-
-```json
-{
-  "text": "The Q4 incident report shows error rates increased by 40%...",
-  "source_id": "incident-2026-01",
-  "metadata": {
-    "space": "evidence",
-    "type": "incident_report"
   }
 }
 ```
@@ -299,94 +114,48 @@ Ingest text into the vector and document stores.
 
 ## CLI Reference
 
-```
-opencrab init              Create .env from template
-opencrab serve             Start MCP server (stdio)
-opencrab status            Check store connections
-opencrab ingest <path>     Ingest files into vector store
-opencrab query <question>  Run a hybrid query
-opencrab manifest          Print MetaOntology grammar
-```
-
-Global flags:
-
-```
-opencrab --version         Show version
-opencrab query --json-output <q>   Raw JSON output
-opencrab manifest --json-output    Raw JSON grammar
-opencrab ingest -r <dir>   Recursive ingestion
-opencrab ingest -e .txt,.md <dir>  Filter by extension
+```text
+little-crab init              Create .env from template
+little-crab serve             Start MCP server (stdio)
+little-crab status            Check embedded store connections
+little-crab ingest <path>     Ingest files into vector store
+little-crab query <question>  Run a hybrid query
+little-crab manifest          Print MetaOntology grammar
 ```
 
----
+Compatibility alias:
 
-## Impact Categories (I1–I7)
-
-| ID | Name                     | Question                                              |
-|----|--------------------------|-------------------------------------------------------|
-| I1 | Data impact              | What data values or records change?                   |
-| I2 | Relation impact          | What graph edges are affected?                        |
-| I3 | Space impact             | Which ontology spaces are touched?                    |
-| I4 | Permission impact        | Which access permissions change?                      |
-| I5 | Logic impact             | Which business rules are invalidated?                 |
-| I6 | Cache/index impact       | Which caches or indexes must be refreshed?            |
-| I7 | Downstream system impact | Which external systems or APIs are affected?          |
-
----
-
-## Active Metadata Layers
-
-Every node and edge can carry orthogonal metadata attributes:
-
-| Layer      | Attributes                         |
-|------------|------------------------------------|
-| existence  | identity, provenance, lineage      |
-| quality    | confidence, freshness, completeness|
-| relational | dependency, sensitivity, maturity  |
-| behavioral | usage, mutation, effect            |
+```text
+opencrab <same-command>
+```
 
 ---
 
 ## Development
 
 ```bash
-make dev-install    # install with dev extras
-make up             # start legacy docker compatibility services
-make seed           # seed embedded or docker runtime based on STORAGE_MODE
-make test           # run test suite
-make coverage       # test + coverage report
-make lint           # ruff linter
-make format         # black + isort
-make status         # check store connections
-```
-
-### Running integration tests
-
-Integration tests require live services:
-
-```bash
-OPENCRAB_INTEGRATION=1 pytest tests/ -v
+make dev-install
+make seed
+make status
+make test
+make lint
+make format
 ```
 
 ### Project structure
 
-```
+```text
 opencrab/
-├── grammar/          # MetaOntology grammar (manifest, validator, glossary)
-├── stores/           # Store adapters (LadybugDB, DuckDB, ChromaDB, legacy docker backends)
-├── ontology/         # Ontology engine (builder, ReBAC, impact, query)
-└── mcp/              # MCP server (stdio JSON-RPC) and tool definitions
-tests/                # Test suite (grammar, stores, MCP tools)
+├── grammar/          # MetaOntology grammar and validation
+├── stores/           # LadybugDB, DuckDB, ChromaDB adapters
+├── ontology/         # Builder, query, ReBAC, impact, extractor
+└── mcp/              # MCP server and tool definitions
+tests/                # Local-first test suite
 scripts/              # Seed script
-docker-compose.yml    # Legacy compatibility services
 ```
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
----
-
-*OpenCrab: resistance is futile. Your agent will become an ontology.*
+MIT

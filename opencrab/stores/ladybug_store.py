@@ -12,10 +12,13 @@ from __future__ import annotations
 
 import ast
 import base64
+from contextlib import contextmanager
 import json
 import logging
 import os
 import re
+import threading
+import time
 from collections import deque
 from typing import Any
 
@@ -31,9 +34,9 @@ class LadybugStore:
 
     def __init__(self, db_path: str) -> None:
         self._db_path = db_path
-        self._db: Any = None
-        self._conn: Any = None
+        self._lb: Any = None
         self._available = False
+        self._op_lock = threading.RLock()
         self._connect()
 
     def _connect(self) -> None:
@@ -44,8 +47,7 @@ class LadybugStore:
             if directory:
                 os.makedirs(directory, exist_ok=True)
 
-            self._db = lb.Database(self._db_path)
-            self._conn = lb.Connection(self._db)
+            self._lb = lb
             self._available = True
             self._ensure_schema()
             logger.info("LadybugStore initialised at %s", self._db_path)
@@ -58,13 +60,9 @@ class LadybugStore:
         return self._available
 
     def close(self) -> None:
-        for resource in (self._conn, self._db):
-            close = getattr(resource, "close", None)
-            if callable(close):
-                try:
-                    close()
-                except Exception:
-                    pass
+        # Connections are opened per operation, so there is no persistent
+        # handle to close here.
+        return None
 
     def ping(self) -> bool:
         try:
@@ -122,6 +120,17 @@ class LadybugStore:
             "space": space_id or properties.get("space"),
             "node_type": node_type,
         }
+        requested_space = str(space_id or properties.get("space") or "")
+        existing = self._get_existing_identity(node_id)
+        if existing is not None:
+            existing_type = str(existing.get("node_type") or "")
+            existing_space = str(existing.get("space") or "")
+            if existing_type != node_type or existing_space != requested_space:
+                raise ValueError(
+                    "node_id "
+                    f"{node_id!r} already exists as {existing_space or '?'}"
+                    f"/{existing_type or '?'}; node ids must stay globally unique."
+                )
         self._execute(
             """
             MERGE (n:OntologyNode {id: $id})
@@ -336,12 +345,58 @@ class LadybugStore:
         *,
         dict_rows: bool = True,
     ) -> list[dict[str, Any]] | list[list[Any]]:
-        result = self._conn.execute(query, params or {})
-        if hasattr(result, "rows_as_dict") and dict_rows:
-            return result.rows_as_dict().get_all()
-        if hasattr(result, "get_all"):
-            return result.get_all()
-        return list(result)
+        with self._connection() as conn:
+            result = conn.execute(query, params or {})
+            try:
+                if hasattr(result, "rows_as_dict") and dict_rows:
+                    return result.rows_as_dict().get_all()
+                if hasattr(result, "get_all"):
+                    return result.get_all()
+                return list(result)
+            finally:
+                close = getattr(result, "close", None)
+                if callable(close):
+                    try:
+                        close()
+                    except Exception:
+                        pass
+
+    @contextmanager
+    def _connection(self) -> Any:
+        if self._lb is None:
+            raise RuntimeError("LadybugStore is not available.")
+
+        with self._op_lock:
+            db, conn = self._open_handles()
+            try:
+                yield conn
+            finally:
+                for resource in (conn, db):
+                    close = getattr(resource, "close", None)
+                    if callable(close):
+                        try:
+                            close()
+                        except Exception:
+                            pass
+
+    def _open_handles(self) -> tuple[Any, Any]:
+        if self._lb is None:
+            raise RuntimeError("LadybugStore is not available.")
+
+        last_exc: Exception | None = None
+        for attempt in range(5):
+            try:
+                db = self._lb.Database(self._db_path)
+                conn = self._lb.Connection(db)
+                return db, conn
+            except Exception as exc:
+                last_exc = exc
+                if "Could not set lock on file" not in str(exc) or attempt == 4:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
+
+        assert last_exc is not None
+        raise last_exc
 
     def _translate_runtime_cypher(self, cypher: str) -> str:
         translated = cypher
@@ -476,3 +531,14 @@ class LadybugStore:
         if row.get("text"):
             props.setdefault("text", row.get("text"))
         return props
+
+    def _get_existing_identity(self, node_id: str) -> dict[str, Any] | None:
+        rows = self._execute(
+            """
+            MATCH (n:OntologyNode {id: $id})
+            RETURN n.node_type AS node_type, n.space AS space
+            LIMIT 1
+            """,
+            {"id": node_id},
+        )
+        return rows[0] if rows else None

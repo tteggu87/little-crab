@@ -1,11 +1,9 @@
 """
 ChromaDB vector store adapter.
 
-Supports two modes:
-- local: uses ChromaDB PersistentClient (no server needed, data in local dir)
-- docker: uses ChromaDB HttpClient (requires running ChromaDB container)
-
-All methods degrade gracefully when unavailable.
+little-crab uses embedded PersistentClient mode by default. The adapter still
+retains an optional HTTP path, but the fork's factory only constructs the
+embedded local variant.
 """
 
 from __future__ import annotations
@@ -19,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class ChromaStore:
-    """ChromaDB adapter — local (PersistentClient) or docker (HttpClient)."""
+    """ChromaDB adapter with embedded local mode as the default path."""
 
     def __init__(
         self,

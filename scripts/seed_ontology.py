@@ -1,11 +1,11 @@
 """
-Seed script: populate the OpenCrab stores with a representative
+Seed script: populate the little-crab embedded stores with a representative
 example ontology based on a fictional data analytics platform.
 
 Run with:
     python scripts/seed_ontology.py
 
-Works in both embedded local mode and legacy docker mode.
+Designed for the local-first LadybugDB + DuckDB + embedded ChromaDB runtime.
 """
 
 from __future__ import annotations
@@ -179,7 +179,7 @@ INGEST_TEXTS: list[tuple[str, str, dict]] = [
 
 
 def seed() -> None:
-    console.print("\n[bold magenta]OpenCrab Seed Script[/bold magenta]")
+    console.print("\n[bold magenta]little-crab Seed Script[/bold magenta]")
     console.print("[dim]Populating example analytics platform ontology...[/dim]\n")
 
     from opencrab.config import get_settings
@@ -205,21 +205,20 @@ def seed() -> None:
     store_table = Table(title="Store Status", show_header=True)
     store_table.add_column("Store")
     store_table.add_column("Status")
-    store_names = (
-        [("LadybugDB", graph), ("ChromaDB Embedded", chroma), ("DuckDB", sql)]
-        if cfg.is_local
-        else [("Neo4j", graph), ("ChromaDB", chroma), ("MongoDB", docs), ("PostgreSQL", sql)]
-    )
+    store_names = [
+        ("LadybugDB", graph),
+        ("ChromaDB Embedded", chroma),
+        ("DuckDB", sql),
+    ]
     for name, store in store_names:
         status = "[green]CONNECTED[/green]" if store.available else "[red]UNAVAILABLE[/red]"
         store_table.add_row(name, status)
     console.print(store_table)
 
     if not any([graph.available, chroma.available, docs.available, sql.available]):
-        if cfg.is_local:
-            console.print("\n[red]Embedded stores unavailable. Check Python dependencies and LOCAL_DATA_DIR.[/red]")
-        else:
-            console.print("\n[red]All stores unavailable. Start services with: docker compose up -d[/red]")
+        console.print(
+            "\n[red]Embedded stores unavailable. Check Python dependencies and LOCAL_DATA_DIR.[/red]"
+        )
         return
 
     builder = OntologyBuilder(graph, docs, sql)
@@ -278,7 +277,7 @@ def seed() -> None:
         except Exception as exc:
             console.print(f"  [red]Policy seed failed: {exc}[/red]")
     else:
-        console.print("  [yellow]PostgreSQL unavailable, skipping ReBAC seed.[/yellow]")
+        console.print("  [yellow]DuckDB unavailable, skipping ReBAC seed.[/yellow]")
 
     # --- Ingest text documents ---
     console.print(f"\n[bold]Ingesting {len(INGEST_TEXTS)} text documents...[/bold]")
@@ -299,7 +298,7 @@ def seed() -> None:
     console.print("\n[bold green]Seed complete![/bold green]")
     if sql.available:
         counts = sql.table_counts()
-        summary = Table(title="DuckDB Table Counts" if cfg.is_local else "PostgreSQL Table Counts")
+        summary = Table(title="DuckDB Table Counts")
         summary.add_column("Table")
         summary.add_column("Rows", justify="right")
         for table, count in counts.items():
@@ -308,9 +307,8 @@ def seed() -> None:
 
     if docs.available and hasattr(docs, "collection_stats"):
         doc_counts = docs.collection_stats()
-        label = "DuckDB" if cfg.is_local else "MongoDB"
         console.print(
-            f"\n[bold]{label}:[/bold] "
+            f"\n[bold]DuckDB:[/bold] "
             f"nodes={doc_counts.get('nodes', 0)}, "
             f"sources={doc_counts.get('sources', 0)}, "
             f"audit_log={doc_counts.get('audit_log', 0)}"
@@ -318,12 +316,10 @@ def seed() -> None:
 
     if graph.available and hasattr(graph, "count_nodes"):
         total_nodes = graph.count_nodes()
-        label = "LadybugDB" if cfg.is_local else "Neo4j"
-        console.print(f"[bold]{label}:[/bold] {total_nodes} nodes")
+        console.print(f"[bold]LadybugDB:[/bold] {total_nodes} nodes")
 
     if chroma.available:
-        label = "ChromaDB Embedded" if cfg.is_local else "ChromaDB"
-        console.print(f"[bold]{label}:[/bold] {chroma.count()} vectors")
+        console.print(f"[bold]ChromaDB Embedded:[/bold] {chroma.count()} vectors")
 
     console.print(
         "\n[dim]Run 'opencrab query \"system performance\"' to test the ontology.[/dim]"

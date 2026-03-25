@@ -1,5 +1,5 @@
 """
-OpenCrab CLI — Click command interface.
+little-crab CLI — Click command interface.
 
 Commands:
   init      Create .env from template
@@ -33,9 +33,9 @@ console = Console()
 
 
 @click.group()
-@click.version_option(package_name="opencrab")
+@click.version_option(package_name="little-crab")
 def main() -> None:
-    """OpenCrab — MetaOntology MCP server. Carcinization is inevitable."""
+    """little-crab — local-first MetaOntology MCP runtime."""
 
 
 # ---------------------------------------------------------------------------
@@ -73,16 +73,14 @@ def init(force: bool) -> None:
     console.print(
         Panel(
             "[bold]Next steps:[/bold]\n\n"
-            "1. Edit [cyan].env[/cyan] with your credentials.\n"
+            "1. Edit [cyan].env[/cyan] if you want a custom data path.\n"
             "2. Verify the embedded runtime:\n"
             "   [cyan]opencrab status[/cyan]\n"
             "3. Seed the embedded stores:\n"
             "   [cyan]python scripts/seed_ontology.py[/cyan]\n"
             "4. Add to Claude Code MCP config:\n"
-            "   [cyan]claude mcp add opencrab -- opencrab serve[/cyan]\n"
-            "5. Optional legacy compatibility mode:\n"
-            "   [cyan]docker compose up -d[/cyan] and set [cyan]STORAGE_MODE=docker[/cyan]",
-            title="OpenCrab Setup",
+            "   [cyan]claude mcp add little-crab -- opencrab serve[/cyan]",
+            title="little-crab Setup",
             border_style="green",
         )
     )
@@ -92,16 +90,8 @@ def _write_default_env(path: Path) -> None:
     content = """\
 STORAGE_MODE=local
 LOCAL_DATA_DIR=./opencrab_data
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=opencrab
-MONGODB_URI=mongodb://root:opencrab@localhost:27017
-MONGODB_DB=opencrab
-POSTGRES_URL=postgresql://opencrab:opencrab@localhost:5432/opencrab
-CHROMA_HOST=localhost
-CHROMA_PORT=8000
-CHROMA_COLLECTION=opencrab_vectors
-MCP_SERVER_NAME=opencrab
+CHROMA_COLLECTION=little_crab_vectors
+MCP_SERVER_NAME=little-crab
 MCP_SERVER_VERSION=0.1.0
 LOG_LEVEL=INFO
 """
@@ -115,7 +105,7 @@ LOG_LEVEL=INFO
 
 @main.command()
 def serve() -> None:
-    """Start the OpenCrab MCP server on stdio (for Claude Code integration)."""
+    """Start the little-crab MCP server on stdio."""
     # Suppress all non-error logging to keep stdio clean
     logging.basicConfig(level=logging.ERROR, stream=sys.stderr)
     from opencrab.mcp.server import MCPServer
@@ -131,7 +121,7 @@ def serve() -> None:
 
 @main.command()
 def status() -> None:
-    """Check connectivity to all configured data stores."""
+    """Check connectivity to the embedded local stores."""
     from opencrab.config import get_settings
     from opencrab.stores.factory import (
         make_doc_store,
@@ -141,28 +131,23 @@ def status() -> None:
     )
 
     cfg = get_settings()
-    mode_label = f"[bold cyan]{cfg.storage_mode.upper()} MODE[/bold cyan]"
-    storage_loc = cfg.local_data_dir if cfg.is_local else "Docker services"
+    mode_label = "[bold cyan]LOCAL MODE[/bold cyan]"
+    storage_loc = cfg.local_data_dir
     console.print(f"\n{mode_label} - storage at: {storage_loc}\n")
 
-    graph  = make_graph_store(cfg)
+    graph = make_graph_store(cfg)
     vector = make_vector_store(cfg)
-    sql    = make_sql_store(cfg)
+    sql = make_sql_store(cfg)
 
-    if cfg.is_local:
-        store_rows: list[tuple[str, str, Any]] = [
-            ("Graph (LadybugDB)", cfg.local_data_dir + "/graph.lbug",  graph),
-            ("Vector (ChromaDB Embedded)", getattr(vector, "location", cfg.local_data_dir + "/chroma"), vector),
-            ("Operational Store (DuckDB)", cfg.local_data_dir + "/opencrab.db", sql),
-        ]
-    else:
-        docs = make_doc_store(cfg)
-        store_rows = [
-            ("Graph (Neo4j)",     cfg.neo4j_uri,                      graph),
-            ("Docs (MongoDB)",    cfg.mongodb_uri.split("@")[-1],     docs),
-            ("SQL (PostgreSQL)",  cfg.postgres_url.split("@")[-1],    sql),
-            ("Vector (ChromaDB)", cfg.chroma_url,                     vector),
-        ]
+    store_rows: list[tuple[str, str, Any]] = [
+        ("Graph (LadybugDB)", cfg.local_data_dir + "/graph.lbug", graph),
+        (
+            "Vector (ChromaDB Embedded)",
+            getattr(vector, "location", cfg.local_data_dir + "/chroma"),
+            vector,
+        ),
+        ("Operational Store (DuckDB)", cfg.local_data_dir + "/opencrab.db", sql),
+    ]
 
     table = Table(title="OpenCrab Store Status", show_header=True, header_style="bold cyan")
     table.add_column("Store", style="bold")
@@ -196,17 +181,26 @@ def ingest(path: str, recursive: bool, extension: str) -> None:
     """Ingest files from PATH into the ontology vector store."""
     from opencrab.config import get_settings
     from opencrab.ontology.query import HybridQuery
-    from opencrab.stores.factory import make_doc_store, make_graph_store, make_vector_store
+    from opencrab.stores.factory import (
+        make_doc_store,
+        make_graph_store,
+        make_vector_store,
+    )
 
     cfg = get_settings()
     chroma = make_vector_store(cfg)
-    neo4j = make_graph_store(cfg)
-    mongo = make_doc_store(cfg)
-    hybrid = HybridQuery(chroma, neo4j)
+    graph = make_graph_store(cfg)
+    docs = make_doc_store(cfg)
+    hybrid = HybridQuery(chroma, graph)
 
-    extensions = [e.strip() for e in extension.split(",")]
+    extensions = [e.strip() for e in extension.split(",") if e.strip()]
     root = Path(path)
-    files = list(root.rglob("*")) if recursive else list(root.iterdir())
+
+    if root.is_file():
+        files = [root]
+    else:
+        files = list(root.rglob("*")) if recursive else list(root.iterdir())
+
     files = [f for f in files if f.is_file() and f.suffix in extensions]
 
     if not files:
@@ -226,8 +220,8 @@ def ingest(path: str, recursive: bool, extension: str) -> None:
 
             hybrid.ingest(text=text, source_id=source_id, metadata=meta)
 
-            if mongo.available:
-                mongo.upsert_source(source_id, text, meta)
+            if docs.available:
+                docs.upsert_source(source_id, text, meta)
 
             ok_count += 1
             console.print(f"  [green]OK[/green] {file.name} ({len(text)} chars)")
@@ -255,8 +249,8 @@ def query(question: str, spaces: str | None, limit: int, json_output: bool) -> N
 
     cfg = get_settings()
     chroma = make_vector_store(cfg)
-    neo4j = make_graph_store(cfg)
-    hybrid = HybridQuery(chroma, neo4j)
+    graph = make_graph_store(cfg)
+    hybrid = HybridQuery(chroma, graph)
 
     space_filter = [s.strip() for s in spaces.split(",")] if spaces else None
 

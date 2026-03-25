@@ -2,8 +2,8 @@
 ReBAC (Relationship-Based Access Control) Engine.
 
 Determines whether a subject has a given permission over a resource
-by traversing the Neo4j graph along MetaOntology subject→resource edges
-and consulting stored policy rows in PostgreSQL.
+by traversing the graph along MetaOntology subject→resource edges
+and consulting stored policy rows in the embedded operational store.
 
 Decision logic (in order of priority):
   1. Explicit DENY policy in SQL → deny.
@@ -205,7 +205,7 @@ class ReBACEngine:
         permission: str,
         resource_id: str,
     ) -> None:
-        """Explicitly grant a permission in the SQL policy table."""
+        """Explicitly grant a permission in the policy store."""
         validate_rebac_permission(permission).raise_if_invalid()
         if not self._sql.available:
             raise RuntimeError("SQL store not available for policy storage.")
@@ -218,7 +218,7 @@ class ReBACEngine:
         permission: str,
         resource_id: str,
     ) -> None:
-        """Explicitly deny a permission in the SQL policy table."""
+        """Explicitly deny a permission in the policy store."""
         validate_rebac_permission(permission).raise_if_invalid()
         if not self._sql.available:
             raise RuntimeError("SQL store not available for policy storage.")

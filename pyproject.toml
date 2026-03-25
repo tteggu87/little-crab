@@ -3,14 +3,14 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "opencrab"
+name = "little-crab"
 version = "0.1.0"
-description = "MCP server plugin exposing MetaOntology OS grammar to OpenClaw-type agent environments"
+description = "Local-first MCP ontology runtime preserving OpenCrab grammar with LadybugDB, DuckDB, and embedded ChromaDB"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
-    { name = "OpenCrab Contributors" }
+    { name = "little-crab Contributors" }
 ]
 keywords = ["mcp", "ontology", "graph", "agent", "knowledge-graph"]
 classifiers = [
@@ -29,14 +29,7 @@ dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "python-dotenv>=1.0",
-    "neo4j>=5.0",
     "chromadb>=0.5",
-    "pymongo>=4.0",
-    "sqlalchemy>=2.0",
-    "psycopg2-binary>=2.9",
-    "fastapi>=0.110",
-    "uvicorn>=0.28",
-    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
@@ -51,12 +44,13 @@ dev = [
 ]
 
 [project.scripts]
+little-crab = "opencrab.cli:main"
 opencrab = "opencrab.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/opencrab/opencrab"
-Repository = "https://github.com/opencrab/opencrab"
-Issues = "https://github.com/opencrab/opencrab/issues"
+Homepage = "https://github.com/tteggu87/little-crab"
+Repository = "https://github.com/tteggu87/little-crab"
+Issues = "https://github.com/tteggu87/little-crab/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

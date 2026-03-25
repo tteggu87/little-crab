@@ -241,6 +241,38 @@ class TestToolDispatch:
             assert "chromadb" in result["stores"]
             assert result["text_length"] > 0
 
+    def test_ontology_extract_works_without_external_llm(self):
+        from opencrab.mcp.tools import dispatch_tool
+
+        with patch("opencrab.mcp.tools._get_context") as mock_ctx:
+            builder = MagicMock()
+            builder.add_node.return_value = {"stores": {"neo4j": "ok"}}
+            builder.add_edge.return_value = {"stores": {"neo4j": "ok"}}
+            mock_ctx.return_value = {
+                "builder": builder,
+                "rebac": MagicMock(),
+                "impact": MagicMock(),
+                "hybrid": MagicMock(),
+                "mongo": MagicMock(),
+            }
+
+            result = dispatch_tool(
+                "ontology_extract",
+                {
+                    "text": (
+                        "Alice manages Project Atlas. "
+                        "Cache TTL raises reliability for the analytics pipeline."
+                    ),
+                    "source_id": "incident-report.md",
+                },
+            )
+
+            assert result["extractor_mode"] == "heuristic"
+            assert result["extracted_nodes"] >= 2
+            assert result["extracted_edges"] >= 1
+            assert result["added_nodes"] >= 2
+            assert result["added_edges"] >= 1
+
 
 # ---------------------------------------------------------------------------
 # MCP Server protocol tests
@@ -351,22 +383,20 @@ class TestMCPServer:
 
 
 # ---------------------------------------------------------------------------
-# OntologyBuilder unit tests (with SQLite)
+# OntologyBuilder unit tests (local-first runtime)
 # ---------------------------------------------------------------------------
 
 
 class TestOntologyBuilder:
     @pytest.fixture
-    def builder(self):
+    def builder(self, tmp_path):
         from opencrab.ontology.builder import OntologyBuilder
-        from opencrab.stores.mongo_store import MongoStore
-        from opencrab.stores.neo4j_store import Neo4jStore
-        from opencrab.stores.sql_store import SQLStore
+        from opencrab.stores.duckdb_store import DuckDBStore
+        from opencrab.stores.ladybug_store import LadybugStore
 
-        neo4j = Neo4jStore("bolt://invalid:7687", "neo4j", "pw")
-        mongo = MongoStore("mongodb://invalid:27017", "db")
-        sql = SQLStore("sqlite:///:memory:")
-        return OntologyBuilder(neo4j, mongo, sql)
+        graph = LadybugStore(str(tmp_path / "graph.lbug"))
+        store = DuckDBStore(str(tmp_path / "opencrab.db"))
+        return OntologyBuilder(graph, store, store)
 
     def test_add_node_valid(self, builder):
         result = builder.add_node("subject", "User", "u1", {"name": "Alice"})
@@ -374,7 +404,8 @@ class TestOntologyBuilder:
         assert result["space"] == "subject"
         assert result["node_type"] == "User"
         assert "stores" in result
-        # neo4j and mongo are unavailable, but sql should be ok
+        assert result["stores"]["neo4j"] == "ok"
+        assert result["stores"]["mongodb"].startswith("ok")
         assert result["stores"]["postgres"] == "ok"
 
     def test_add_node_invalid_space(self, builder):
@@ -402,20 +433,20 @@ class TestOntologyBuilder:
 
 
 # ---------------------------------------------------------------------------
-# ReBACEngine unit tests (with SQLite)
+# ReBACEngine unit tests (local-first runtime)
 # ---------------------------------------------------------------------------
 
 
 class TestReBACEngine:
     @pytest.fixture
-    def engine(self):
+    def engine(self, tmp_path):
         from opencrab.ontology.rebac import ReBACEngine
-        from opencrab.stores.neo4j_store import Neo4jStore
-        from opencrab.stores.sql_store import SQLStore
+        from opencrab.stores.duckdb_store import DuckDBStore
+        from opencrab.stores.ladybug_store import LadybugStore
 
-        neo4j = Neo4jStore("bolt://invalid:7687", "neo4j", "pw")
-        sql = SQLStore("sqlite:///:memory:")
-        return ReBACEngine(neo4j, sql)
+        graph = LadybugStore(str(tmp_path / "graph.lbug"))
+        sql = DuckDBStore(str(tmp_path / "opencrab.db"))
+        return ReBACEngine(graph, sql)
 
     def test_check_denied_when_no_policy_no_graph(self, engine):
         decision = engine.check("u1", "view", "doc1")
@@ -448,20 +479,20 @@ class TestReBACEngine:
 
 
 # ---------------------------------------------------------------------------
-# ImpactEngine unit tests (with SQLite, no Neo4j)
+# ImpactEngine unit tests (local-first runtime)
 # ---------------------------------------------------------------------------
 
 
 class TestImpactEngine:
     @pytest.fixture
-    def engine(self):
+    def engine(self, tmp_path):
         from opencrab.ontology.impact import ImpactEngine
-        from opencrab.stores.neo4j_store import Neo4jStore
-        from opencrab.stores.sql_store import SQLStore
+        from opencrab.stores.duckdb_store import DuckDBStore
+        from opencrab.stores.ladybug_store import LadybugStore
 
-        neo4j = Neo4jStore("bolt://invalid:7687", "neo4j", "pw")
-        sql = SQLStore("sqlite:///:memory:")
-        return ImpactEngine(neo4j, sql)
+        graph = LadybugStore(str(tmp_path / "graph.lbug"))
+        sql = DuckDBStore(str(tmp_path / "opencrab.db"))
+        return ImpactEngine(graph, sql)
 
     def test_analyse_returns_impact_result(self, engine):
         from opencrab.ontology.impact import ImpactResult
@@ -484,8 +515,6 @@ class TestImpactEngine:
         assert len(triggered_ids) >= 3
 
     def test_analyse_persists_to_sql(self, engine):
-        from opencrab.stores.sql_store import SQLStore
-
         engine.analyse("n4", "update")
         records = engine._sql.get_impacts("n4")
         assert len(records) >= 1

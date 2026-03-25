@@ -2,10 +2,10 @@
 Ontology Builder.
 
 High-level API for adding nodes and edges to the multi-store ontology.
-Validates against the MetaOntology grammar before writing to any store.
-Writes to Neo4j (graph), MongoDB (document), and PostgreSQL (registry)
-in a best-effort fan-out pattern — individual store failures are logged
-but do not abort the operation.
+Validates against the MetaOntology grammar before writing to the local
+graph, document/event, and registry stores. Writes happen in a best-effort
+fan-out pattern so one store failure does not automatically abort the whole
+operation.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class OntologyBuilder:
-    """Coordinates multi-store writes for ontology nodes and edges."""
+    """Coordinates graph/document/registry writes for ontology nodes and edges."""
 
     def __init__(
         self,
@@ -53,7 +53,7 @@ class OntologyBuilder:
         node_type:
             Node type label (e.g. "User", "Document").
         node_id:
-            Stable unique identifier for the node.
+            Stable unique identifier for the node across the ontology.
         properties:
             Arbitrary key/value properties for the node.
 
@@ -71,6 +71,7 @@ class OntologyBuilder:
         # Grammar validation (raises ValueError on failure)
         result = validate_node(space, node_type)
         result.raise_if_invalid()
+        self._assert_node_id_is_globally_unique(space, node_type, node_id)
 
         output: dict[str, Any] = {
             "node_id": node_id,
@@ -80,7 +81,7 @@ class OntologyBuilder:
             "stores": {},
         }
 
-        # --- Neo4j write ---
+        # --- Graph write ---
         if self._neo4j.available:
             try:
                 node_props = self._neo4j.upsert_node(
@@ -92,12 +93,12 @@ class OntologyBuilder:
                 output["stores"]["neo4j"] = "ok"
                 output["node_data"] = node_props
             except Exception as exc:
-                logger.warning("Neo4j node write failed for %s: %s", node_id, exc)
+                logger.warning("Graph node write failed for %s: %s", node_id, exc)
                 output["stores"]["neo4j"] = f"error: {exc}"
         else:
             output["stores"]["neo4j"] = "unavailable"
 
-        # --- MongoDB write ---
+        # --- Document/audit write ---
         if self._mongo.available:
             try:
                 mongo_id = self._mongo.upsert_node_doc(space, node_type, node_id, props)
@@ -108,12 +109,12 @@ class OntologyBuilder:
                     details={"space": space, "node_type": node_type, "node_id": node_id},
                 )
             except Exception as exc:
-                logger.warning("MongoDB node write failed for %s: %s", node_id, exc)
+                logger.warning("Document store node write failed for %s: %s", node_id, exc)
                 output["stores"]["mongodb"] = f"error: {exc}"
         else:
             output["stores"]["mongodb"] = "unavailable"
 
-        # --- PostgreSQL registry write ---
+        # --- Registry write ---
         if self._sql.available:
             try:
                 self._sql.register_node(space, node_type, node_id)
@@ -181,7 +182,7 @@ class OntologyBuilder:
             "stores": {},
         }
 
-        # Resolve node types from Neo4j if available, else use space as type
+        # Resolve node types from the graph if available, else use space defaults
         from_type = _space_to_default_type(from_space)
         to_type = _space_to_default_type(to_space)
 
@@ -204,18 +205,18 @@ class OntologyBuilder:
             except Exception:
                 pass  # use defaults
 
-        # --- Neo4j write ---
+        # --- Graph write ---
         if self._neo4j.available:
             try:
                 ok = self._neo4j.upsert_edge(from_type, from_id, relation, to_type, to_id, props)
                 output["stores"]["neo4j"] = "ok" if ok else "no match"
             except Exception as exc:
-                logger.warning("Neo4j edge write failed: %s", exc)
+                logger.warning("Graph edge write failed: %s", exc)
                 output["stores"]["neo4j"] = f"error: {exc}"
         else:
             output["stores"]["neo4j"] = "unavailable"
 
-        # --- PostgreSQL registry ---
+        # --- Registry write ---
         if self._sql.available:
             try:
                 self._sql.register_edge(from_space, from_id, relation, to_space, to_id)
@@ -226,7 +227,7 @@ class OntologyBuilder:
         else:
             output["stores"]["postgres"] = "unavailable"
 
-        # --- MongoDB audit ---
+        # --- Document/audit write ---
         if self._mongo.available:
             self._mongo.log_event(
                 "edge_upsert",
@@ -246,6 +247,53 @@ class OntologyBuilder:
         logger.info("Edge added: %s/%s -[%s]-> %s/%s", from_space, from_id, relation, to_space, to_id)
         return output
 
+    def _assert_node_id_is_globally_unique(
+        self,
+        space: str,
+        node_type: str,
+        node_id: str,
+    ) -> None:
+        """Reject cross-space/type reuse of a node_id before fan-out writes begin."""
+        if self._neo4j.available:
+            try:
+                rows = self._neo4j.run_cypher(
+                    """
+                    MATCH (n {id: $id})
+                    RETURN labels(n)[0] AS lbl, n.space AS space
+                    LIMIT 5
+                    """,
+                    {"id": node_id},
+                )
+            except Exception as exc:
+                logger.debug("Graph uniqueness precheck failed for %s: %s", node_id, exc)
+            else:
+                for row in rows:
+                    existing_type = row.get("lbl")
+                    existing_space = row.get("space")
+                    if existing_type == node_type and existing_space == space:
+                        continue
+                    raise ValueError(
+                        _format_identity_conflict(node_id, existing_space, existing_type)
+                    )
+
+        if self._mongo.available:
+            try:
+                nodes = self._mongo.list_nodes()
+            except Exception as exc:
+                logger.debug("Doc-store uniqueness precheck failed for %s: %s", node_id, exc)
+                return
+
+            for node in nodes:
+                if node.get("node_id") != node_id:
+                    continue
+                existing_type = node.get("node_type")
+                existing_space = node.get("space")
+                if existing_type == node_type and existing_space == space:
+                    continue
+                raise ValueError(
+                    _format_identity_conflict(node_id, existing_space, existing_type)
+                )
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -259,3 +307,15 @@ def _space_to_default_type(space_id: str) -> str:
     spec = SPACES.get(space_id, {})
     types = spec.get("node_types", [])
     return types[0] if types else space_id.capitalize()
+
+
+def _format_identity_conflict(
+    node_id: str,
+    existing_space: str | None,
+    existing_type: str | None,
+) -> str:
+    return (
+        f"node_id {node_id!r} already exists as "
+        f"{existing_space or '?'} / {existing_type or '?'}; "
+        "node ids must remain globally unique across spaces."
+    )

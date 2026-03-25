@@ -1,9 +1,9 @@
 """
 DuckDB-backed embedded store for serverless OpenCrab mode.
 
-This store collapses the old MongoDB and PostgreSQL responsibilities into a
-single embedded database file while preserving the runtime-facing methods that
-the builder, ingest flow, ReBAC engine, and impact engine already use.
+This store keeps documents, events, registry state, policies, impacts, and
+simulations in a single embedded database file while preserving the runtime
+methods the builder, ingest flow, ReBAC engine, and impact engine already use.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import threading
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
 
@@ -23,9 +24,9 @@ class DuckDBStore:
 
     def __init__(self, path: str) -> None:
         self._path = path
-        self._conn: Any = None
+        self._duckdb: Any = None
         self._available = False
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._connect()
 
     def _connect(self) -> None:
@@ -35,7 +36,7 @@ class DuckDBStore:
             directory = os.path.dirname(self._path)
             if directory:
                 os.makedirs(directory, exist_ok=True)
-            self._conn = duckdb.connect(self._path)
+            self._duckdb = duckdb
             self._available = True
             self._create_tables()
             logger.info("DuckDB store connected (%s)", self._path)
@@ -127,9 +128,9 @@ class DuckDBStore:
             )
             """,
         ]
-        with self._lock:
+        with self._connection() as conn:
             for statement in ddl:
-                self._conn.execute(statement)
+                conn.execute(statement)
 
     @property
     def available(self) -> bool:
@@ -139,7 +140,8 @@ class DuckDBStore:
         if not self._available:
             return False
         try:
-            self._conn.execute("SELECT 1")
+            with self._connection() as conn:
+                conn.execute("SELECT 1")
             return True
         except Exception:
             return False
@@ -159,9 +161,23 @@ class DuckDBStore:
             return {}
         return json.loads(payload)
 
-    def _next_id(self, table: str) -> int:
-        row = self._conn.execute(f"SELECT COALESCE(MAX(id), 0) + 1 FROM {table}").fetchone()  # noqa: S608
+    def _next_id(self, conn: Any, table: str) -> int:
+        row = conn.execute(f"SELECT COALESCE(MAX(id), 0) + 1 FROM {table}").fetchone()  # noqa: S608
         return int(row[0]) if row else 1
+
+    @contextmanager
+    def _connection(self) -> Any:
+        if self._duckdb is None:
+            raise RuntimeError("DuckDB store is not available.")
+
+        with self._lock:
+            conn = self._duckdb.connect(self._path)
+            try:
+                yield conn
+            finally:
+                close = getattr(conn, "close", None)
+                if callable(close):
+                    close()
 
     # ------------------------------------------------------------------
     # Node document operations
@@ -179,8 +195,8 @@ class DuckDBStore:
 
         doc_id = f"{space}::{node_id}"
         now = self._now()
-        with self._lock:
-            self._conn.execute(
+        with self._connection() as conn:
+            conn.execute(
                 """
                 INSERT INTO node_documents
                     (doc_id, space, node_type, node_id, properties_json, created_at, updated_at)
@@ -198,14 +214,15 @@ class DuckDBStore:
         if not self._available:
             raise RuntimeError("DuckDB store is not available.")
 
-        row = self._conn.execute(
-            """
-            SELECT space, node_type, node_id, properties_json, created_at, updated_at
-            FROM node_documents
-            WHERE space = ? AND node_id = ?
-            """,
-            [space, node_id],
-        ).fetchone()
+        with self._connection() as conn:
+            row = conn.execute(
+                """
+                SELECT space, node_type, node_id, properties_json, created_at, updated_at
+                FROM node_documents
+                WHERE space = ? AND node_id = ?
+                """,
+                [space, node_id],
+            ).fetchone()
         if row is None:
             return None
         return {
@@ -230,7 +247,8 @@ class DuckDBStore:
             query += " WHERE space = ?"
             params.append(space)
         query += " ORDER BY updated_at DESC"
-        rows = self._conn.execute(query, params).fetchall()
+        with self._connection() as conn:
+            rows = conn.execute(query, params).fetchall()
         return [
             {
                 "space": row[0],
@@ -247,8 +265,8 @@ class DuckDBStore:
         if not self._available:
             raise RuntimeError("DuckDB store is not available.")
 
-        with self._lock:
-            row = self._conn.execute(
+        with self._connection() as conn:
+            row = conn.execute(
                 "DELETE FROM node_documents WHERE space = ? AND node_id = ? RETURNING node_id",
                 [space, node_id],
             ).fetchone()
@@ -268,8 +286,8 @@ class DuckDBStore:
             raise RuntimeError("DuckDB store is not available.")
 
         now = self._now()
-        with self._lock:
-            self._conn.execute(
+        with self._connection() as conn:
+            conn.execute(
                 """
                 INSERT INTO source_documents
                     (source_id, text, metadata_json, created_at, updated_at)
@@ -287,14 +305,15 @@ class DuckDBStore:
         if not self._available:
             raise RuntimeError("DuckDB store is not available.")
 
-        row = self._conn.execute(
-            """
-            SELECT source_id, text, metadata_json, created_at, updated_at
-            FROM source_documents
-            WHERE source_id = ?
-            """,
-            [source_id],
-        ).fetchone()
+        with self._connection() as conn:
+            row = conn.execute(
+                """
+                SELECT source_id, text, metadata_json, created_at, updated_at
+                FROM source_documents
+                WHERE source_id = ?
+                """,
+                [source_id],
+            ).fetchone()
         if row is None:
             return None
         return {
@@ -309,15 +328,16 @@ class DuckDBStore:
         if not self._available:
             raise RuntimeError("DuckDB store is not available.")
 
-        rows = self._conn.execute(
-            """
-            SELECT source_id, metadata_json, created_at, updated_at
-            FROM source_documents
-            ORDER BY updated_at DESC
-            LIMIT ?
-            """,
-            [limit],
-        ).fetchall()
+        with self._connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT source_id, metadata_json, created_at, updated_at
+                FROM source_documents
+                ORDER BY updated_at DESC
+                LIMIT ?
+                """,
+                [limit],
+            ).fetchall()
         return [
             {
                 "source_id": row[0],
@@ -348,8 +368,8 @@ class DuckDBStore:
 
         timestamp = self._now()
         event_id = f"{event_type}::{timestamp}"
-        with self._lock:
-            self._conn.execute(
+        with self._connection() as conn:
+            conn.execute(
                 """
                 INSERT INTO audit_log
                     (event_id, event_type, actor, subject_id, details_json, timestamp)
@@ -381,7 +401,8 @@ class DuckDBStore:
             params.append(event_type)
         query += " ORDER BY timestamp DESC LIMIT ?"
         params.append(limit)
-        rows = self._conn.execute(query, params).fetchall()
+        with self._connection() as conn:
+            rows = conn.execute(query, params).fetchall()
         return [
             {
                 "event_type": row[0],
@@ -402,8 +423,8 @@ class DuckDBStore:
             raise RuntimeError("DuckDB store is not available.")
 
         now = self._now()
-        with self._lock:
-            self._conn.execute(
+        with self._connection() as conn:
+            conn.execute(
                 """
                 INSERT INTO ontology_nodes
                     (space, node_type, node_id, created_at, updated_at)
@@ -421,8 +442,8 @@ class DuckDBStore:
         if not self._available:
             raise RuntimeError("DuckDB store is not available.")
 
-        with self._lock:
-            self._conn.execute(
+        with self._connection() as conn:
+            conn.execute(
                 """
                 INSERT INTO ontology_edges
                     (from_space, from_id, relation, to_space, to_id)
@@ -441,9 +462,9 @@ class DuckDBStore:
             raise RuntimeError("DuckDB store is not available.")
 
         now = self._now()
-        with self._lock:
-            row_id = self._next_id("impact_records")
-            self._conn.execute(
+        with self._connection() as conn:
+            row_id = self._next_id(conn, "impact_records")
+            conn.execute(
                 """
                 INSERT INTO impact_records (id, node_id, change_type, impact_json, analyzed_at)
                 VALUES (?, ?, ?, ?, ?)
@@ -456,16 +477,17 @@ class DuckDBStore:
         if not self._available:
             raise RuntimeError("DuckDB store is not available.")
 
-        rows = self._conn.execute(
-            """
-            SELECT id, node_id, change_type, impact_json, analyzed_at
-            FROM impact_records
-            WHERE node_id = ?
-            ORDER BY analyzed_at DESC
-            LIMIT ?
-            """,
-            [node_id, limit],
-        ).fetchall()
+        with self._connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, node_id, change_type, impact_json, analyzed_at
+                FROM impact_records
+                WHERE node_id = ?
+                ORDER BY analyzed_at DESC
+                LIMIT ?
+                """,
+                [node_id, limit],
+            ).fetchall()
         return [
             {
                 "id": row[0],
@@ -488,9 +510,9 @@ class DuckDBStore:
             raise RuntimeError("DuckDB store is not available.")
 
         now = self._now()
-        with self._lock:
-            row_id = self._next_id("lever_simulations")
-            self._conn.execute(
+        with self._connection() as conn:
+            row_id = self._next_id(conn, "lever_simulations")
+            conn.execute(
                 """
                 INSERT INTO lever_simulations
                     (id, lever_id, direction, magnitude, results_json, simulated_at)
@@ -514,8 +536,8 @@ class DuckDBStore:
         if not self._available:
             raise RuntimeError("DuckDB store is not available.")
 
-        with self._lock:
-            self._conn.execute(
+        with self._connection() as conn:
+            conn.execute(
                 """
                 INSERT INTO rebac_policies
                     (subject_id, permission, resource_id, granted)
@@ -530,14 +552,15 @@ class DuckDBStore:
         if not self._available:
             raise RuntimeError("DuckDB store is not available.")
 
-        row = self._conn.execute(
-            """
-            SELECT granted
-            FROM rebac_policies
-            WHERE subject_id = ? AND permission = ? AND resource_id = ?
-            """,
-            [subject_id, permission, resource_id],
-        ).fetchone()
+        with self._connection() as conn:
+            row = conn.execute(
+                """
+                SELECT granted
+                FROM rebac_policies
+                WHERE subject_id = ? AND permission = ? AND resource_id = ?
+                """,
+                [subject_id, permission, resource_id],
+            ).fetchone()
         if row is None:
             return None
         return bool(row[0])
@@ -546,15 +569,16 @@ class DuckDBStore:
         if not self._available:
             raise RuntimeError("DuckDB store is not available.")
 
-        rows = self._conn.execute(
-            """
-            SELECT subject_id, permission, resource_id, granted, created_at
-            FROM rebac_policies
-            WHERE subject_id = ?
-            ORDER BY created_at ASC
-            """,
-            [subject_id],
-        ).fetchall()
+        with self._connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT subject_id, permission, resource_id, granted, created_at
+                FROM rebac_policies
+                WHERE subject_id = ?
+                ORDER BY created_at ASC
+                """,
+                [subject_id],
+            ).fetchall()
         return [
             {
                 "subject_id": row[0],
@@ -602,5 +626,6 @@ class DuckDBStore:
         }
 
     def _count(self, table: str) -> int:
-        row = self._conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()  # noqa: S608
+        with self._connection() as conn:
+            row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()  # noqa: S608
         return int(row[0]) if row else 0

@@ -1,21 +1,19 @@
-.PHONY: help install dev-install up down status serve query manifest lint format test coverage seed
+.PHONY: help install dev-install status serve query manifest lint format test coverage seed
 
 PYTHON := python
 PIP    := pip
 PYTEST := pytest
 
 help:
-	@echo "OpenCrab - MetaOntology MCP Server"
+	@echo "little-crab - local-first ontology MCP runtime"
 	@echo ""
 	@echo "Usage:"
 	@echo "  make install       Install package"
 	@echo "  make dev-install   Install with dev extras"
-	@echo "  make up            Start legacy Docker compatibility services"
-	@echo "  make down          Stop legacy Docker compatibility services"
 	@echo "  make status        Check store connections"
 	@echo "  make serve         Start MCP server on stdio"
 	@echo "  make manifest      Print MetaOntology grammar"
-	@echo "  make seed          Seed embedded or docker runtime based on STORAGE_MODE"
+	@echo "  make seed          Seed embedded local runtime"
 	@echo "  make lint          Run ruff linter"
 	@echo "  make format        Run black + isort"
 	@echo "  make test          Run test suite"
@@ -26,13 +24,6 @@ install:
 
 dev-install:
 	$(PIP) install -e ".[dev]"
-
-up:
-	docker compose up -d
-	@echo "Legacy services starting... set STORAGE_MODE=docker if you want to use them."
-
-down:
-	docker compose down
 
 status:
 	$(PYTHON) -m opencrab.cli status

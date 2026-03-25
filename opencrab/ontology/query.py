@@ -2,7 +2,7 @@
 Hybrid Query Engine.
 
 Combines vector similarity search (ChromaDB) with graph traversal
-(Neo4j) to answer natural language questions about the ontology.
+to answer natural language questions about the ontology.
 
 Query pipeline:
   1. Embed the question and perform a vector similarity search in ChromaDB.
@@ -103,7 +103,7 @@ class HybridQuery:
     def _vector_search(
         self, question: str, spaces: list[str] | None, limit: int
     ) -> list[QueryResult]:
-        """Run ChromaDB semantic similarity search."""
+        """Run embedded ChromaDB semantic similarity search."""
         if not self._chroma.available:
             logger.debug("ChromaDB unavailable, skipping vector search.")
             return []
@@ -235,7 +235,7 @@ class HybridQuery:
         limit: int = 10,
     ) -> list[dict[str, Any]]:
         """
-        Simple keyword search in the Neo4j graph using CONTAINS.
+        Simple keyword search in the embedded graph using CONTAINS.
 
         Parameters
         ----------
