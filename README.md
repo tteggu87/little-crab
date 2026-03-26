@@ -83,7 +83,31 @@ little-crab query "system performance and error rates"
 little-crab manifest
 ```
 
-### 6. Connect as an MCP server
+### 6. Connect from Codex MCP
+
+Windows repo-local example:
+
+```bash
+codex mcp add little-crab ^
+  --env PYTHONPATH=C:\path\to\little-crab ^
+  --env STORAGE_MODE=local ^
+  --env LOCAL_DATA_DIR=C:\path\to\little-crab\opencrab_data ^
+  --env CHROMA_COLLECTION=little_crab_vectors ^
+  --env MCP_SERVER_NAME=little-crab ^
+  --env MCP_SERVER_VERSION=0.1.0 ^
+  --env LOG_LEVEL=WARNING ^
+  -- py -3.12 -m opencrab.cli serve
+```
+
+Then verify:
+
+```bash
+codex mcp list
+```
+
+Open a new Codex session after registration so the new MCP server is visible to the agent.
+
+### 7. Connect from Claude Code MCP
 
 ```bash
 claude mcp add little-crab -- little-crab serve
@@ -112,6 +136,78 @@ claude mcp add little-crab -- opencrab serve
   }
 }
 ```
+
+---
+
+## Recommended Workspace Layout
+
+Keep runtime data separate from source material.
+
+```text
+your-project/
+├── knowledge/
+│   ├── inbox/        # raw notes, docs, reports, transcripts
+│   ├── curated/      # cleaned or important reference docs
+│   └── exports/      # optional generated summaries or extracts
+├── opencrab_data/    # local runtime data created by little-crab
+└── ...
+```
+
+Guidance:
+
+- Put files you want the agent to learn from under `knowledge/inbox/` or `knowledge/curated/`.
+- Do not manually edit `opencrab_data/`; it is runtime state, not source material.
+- Prefer `.md`, `.txt`, `.py`, and short plain-text documents when starting out.
+
+## Loading Material
+
+For batch ingestion from disk:
+
+```bash
+little-crab ingest ./knowledge/inbox -r
+little-crab ingest ./knowledge/curated -r
+```
+
+For agent-driven work over MCP:
+
+- Ask the agent to read one or more files.
+- Ask it to call `ontology_ingest` for semantic retrieval.
+- Ask it to call `ontology_extract` if you want bootstrap nodes/edges.
+- Ask it to call `ontology_query`, `ontology_rebac_check`, `ontology_impact`, or `ontology_lever_simulate` for follow-up analysis.
+
+## What To Ask The Agent
+
+Good starter requests:
+
+- `먼저 ontology_manifest로 문법을 보여주고, 이 저장소에 맞는 공간 구성을 설명해줘.`
+- `knowledge/inbox 폴더 문서들을 읽고 중요한 텍스트를 ontology_ingest 해줘.`
+- `같은 문서들에서 concept, claim, evidence를 ontology_extract로 부트스트랩해줘.`
+- `cache ttl, reliability, incident report 관련 내용을 ontology_query로 찾아줘.`
+- `Alice가 events-dataset을 볼 수 있는지 ontology_rebac_check로 검사해줘.`
+- `cache-ttl-lever를 올렸을 때 outcome 영향이 어떤지 ontology_lever_simulate로 보여줘.`
+- `새 문서가 들어오면 기존 claim과 충돌하는지 확인해줘.`
+
+Useful prompt pattern:
+
+```text
+1. 먼저 ontology_manifest로 현재 문법을 확인해.
+2. knowledge/inbox 아래 문서 중 관련 있는 것만 읽어.
+3. 중요한 본문은 ontology_ingest 해.
+4. 필요한 경우 ontology_extract로 부트스트랩해.
+5. 마지막에는 ontology_query 또는 impact/rebac/simulation으로 답을 정리해.
+```
+
+## Typical Workflow
+
+1. Put raw material into `knowledge/inbox/`.
+2. Connect Codex or Claude Code to little-crab over MCP.
+3. Ask the agent to inspect the grammar with `ontology_manifest`.
+4. Ingest or extract from the material.
+5. Query the graph and vectors.
+6. Add or refine nodes/edges as the ontology grows.
+7. Use ReBAC, impact, and lever simulation when you need analysis instead of retrieval.
+
+For a more detailed usage guide, see [docs/USAGE_GUIDE.md](/C:/python_Github/playground/little-crab/docs/USAGE_GUIDE.md).
 
 ---
 

@@ -36,6 +36,7 @@ little-crab does not ship repo-local Codex skills. Its integration surface is th
 The canonical local dogfood guide for this MCP surface lives at:
 
 - [MCP_DOGFOODING.md](/C:/python_Github/playground/little-crab/docs/MCP_DOGFOODING.md)
+- [USAGE_GUIDE.md](/C:/python_Github/playground/little-crab/docs/USAGE_GUIDE.md)
 
 Use it to validate the real agent workflow:
 

@@ -31,6 +31,7 @@ OpenCrab was worth preserving because it gave agents a bounded but flexible onto
 ## Supporting Evidence
 
 - [AGENT_SESSION_EVIDENCE.md](/C:/python_Github/playground/little-crab/docs/AGENT_SESSION_EVIDENCE.md)
+- [USAGE_GUIDE.md](/C:/python_Github/playground/little-crab/docs/USAGE_GUIDE.md)
 
 ## Source Of Truth Map
 

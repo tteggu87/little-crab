@@ -19,6 +19,7 @@ Canonical docs and intelligence bootstrap were added:
 - [docs/LAYERS.md](/C:/python_Github/playground/little-crab/docs/LAYERS.md)
 - [docs/MCP_DOGFOODING.md](/C:/python_Github/playground/little-crab/docs/MCP_DOGFOODING.md)
 - [docs/AGENT_SESSION_EVIDENCE.md](/C:/python_Github/playground/little-crab/docs/AGENT_SESSION_EVIDENCE.md)
+- [docs/USAGE_GUIDE.md](/C:/python_Github/playground/little-crab/docs/USAGE_GUIDE.md)
 - [docs/evidence/agent_sessions/2026-03-26-canonical](/C:/python_Github/playground/little-crab/docs/evidence/agent_sessions/2026-03-26-canonical)
 - [docs/SKILLS_INTEGRATION.md](/C:/python_Github/playground/little-crab/docs/SKILLS_INTEGRATION.md)
 - [docs/ROADMAP.md](/C:/python_Github/playground/little-crab/docs/ROADMAP.md)
