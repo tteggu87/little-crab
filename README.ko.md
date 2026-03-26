@@ -1,6 +1,8 @@
 # little-crab
 
-[English README](C:/python_Github/playground/little-crab/README.md)
+[English README](README.md)
+
+![little-crab logo](logo.png)
 
 little-crab는 OpenCrab의 문법, validator, MCP tool surface, agentic ontology workflow를 유지하면서 서버형 데이터베이스 운영 부담을 제거한 로컬 퍼스트 포크입니다.
 
@@ -10,7 +12,7 @@ little-crab는 OpenCrab의 문법, validator, MCP tool surface, agentic ontology
 - `DuckDB`: 문서, audit event, registry, policy, impact, simulation
 - embedded `ChromaDB`: 벡터 검색
 
-패키지 이름은 `little-crab`이지만, 호환성을 위해 CLI 엔트리포인트는 `little-crab`와 `opencrab` 둘 다 제공합니다.
+패키지 이름은 `little-crab`이지만, 표준 CLI 명령은 `littlecrab`입니다. 기존 `little-crab`와 `opencrab`는 호환용 alias로 함께 제공합니다.
 
 ---
 
@@ -50,7 +52,7 @@ python -m pip install -e ".[dev]"
 ### 2. 로컬 설정 초기화
 
 ```bash
-little-crab init
+littlecrab init
 ```
 
 이 명령은 `.env`를 만들고 기본 로컬 런타임 설정을 채웁니다.
@@ -67,7 +69,7 @@ LOG_LEVEL=INFO
 ### 3. 내장 스토어 확인
 
 ```bash
-little-crab status
+littlecrab status
 ```
 
 ### 4. 예제 데이터 시드
@@ -79,8 +81,8 @@ python scripts/seed_ontology.py
 ### 5. 질의 실행
 
 ```bash
-little-crab query "system performance and error rates"
-little-crab manifest
+littlecrab query "system performance and error rates"
+littlecrab manifest
 ```
 
 ---
@@ -98,7 +100,7 @@ codex mcp add little-crab ^
   --env MCP_SERVER_NAME=little-crab ^
   --env MCP_SERVER_VERSION=0.1.0 ^
   --env LOG_LEVEL=WARNING ^
-  -- py -3.12 -m opencrab.cli serve
+  -- littlecrab serve
 ```
 
 등록 후 확인:
@@ -109,15 +111,22 @@ codex mcp list
 
 새 MCP 서버를 현재 에이전트 세션에서 보려면 Codex 새 세션을 여는 편이 안전합니다.
 
+만약 `littlecrab` 명령이 `PATH`에 없다면, 가상환경을 활성화하거나 아래 호환 fallback을 쓸 수 있습니다.
+
+```bash
+py -3.12 -m opencrab.cli serve
+```
+
 ## Claude Code MCP 연결
 
 ```bash
-claude mcp add little-crab -- little-crab serve
+claude mcp add little-crab -- littlecrab serve
 ```
 
 호환 alias를 써도 됩니다.
 
 ```bash
+claude mcp add little-crab -- little-crab serve
 claude mcp add little-crab -- opencrab serve
 ```
 
@@ -127,7 +136,7 @@ Claude Code용 JSON 설정 예시는 아래와 같습니다.
 {
   "mcpServers": {
     "little-crab": {
-      "command": "little-crab",
+      "command": "littlecrab",
       "args": ["serve"],
       "env": {
         "LOCAL_DATA_DIR": "./opencrab_data"
@@ -164,8 +173,8 @@ your-project/
 디스크의 파일을 배치로 적재할 때:
 
 ```bash
-little-crab ingest ./knowledge/inbox -r
-little-crab ingest ./knowledge/curated -r
+littlecrab ingest ./knowledge/inbox -r
+littlecrab ingest ./knowledge/curated -r
 ```
 
 에이전트를 통해 MCP로 작업할 때:
@@ -209,17 +218,24 @@ little-crab ingest ./knowledge/curated -r
 6. 필요하면 node/edge를 추가하며 온톨로지를 키웁니다.
 7. 단순 검색이 아니라 분석이 필요하면 ReBAC, impact, lever simulation을 사용합니다.
 
-더 자세한 가이드는 [docs/USAGE_GUIDE.md](C:/python_Github/playground/little-crab/docs/USAGE_GUIDE.md)를 보면 됩니다.
+더 자세한 가이드는 [docs/USAGE_GUIDE.md](docs/USAGE_GUIDE.md)를 보면 됩니다.
 
 ---
 
 ## CLI 요약
 
 ```text
-little-crab init              Create .env from template
-little-crab serve             Start MCP server (stdio)
-little-crab status            Check embedded store connections
-little-crab ingest <path>     Ingest files into vector store
-little-crab query <text>      Query hybrid local ontology data
-little-crab manifest          Print canonical ontology grammar manifest
+littlecrab init               Create .env from template
+littlecrab serve              Start MCP server (stdio)
+littlecrab status             Check embedded store connections
+littlecrab ingest <path>      Ingest files into vector store
+littlecrab query <text>       Query hybrid local ontology data
+littlecrab manifest           Print canonical ontology grammar manifest
+```
+
+호환 alias:
+
+```text
+little-crab <same-command>
+opencrab <same-command>
 ```

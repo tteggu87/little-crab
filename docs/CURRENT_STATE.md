@@ -18,6 +18,7 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 ## Live Entrypoints
 
 - Package scripts: [pyproject.toml](/C:/python_Github/playground/little-crab/pyproject.toml)
+  - `littlecrab = opencrab.cli:main`
   - `little-crab = opencrab.cli:main`
   - `opencrab = opencrab.cli:main`
 - CLI implementation: [opencrab/cli.py](/C:/python_Github/playground/little-crab/opencrab/cli.py)
@@ -63,7 +64,8 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 
 ## Current Truth
 
-- `little-crab` and `opencrab` both resolve to the same CLI implementation.
+- `littlecrab` is the canonical user-facing CLI command.
+- `little-crab` and `opencrab` both resolve to the same CLI implementation as compatibility aliases.
 - The live runtime is the embedded local stack only.
 - Grammar and MCP tool naming remain aligned with upstream OpenCrab semantics.
 - User-facing runtime payloads now describe local roles such as `graph`, `documents`, `registry`, and `vectors` instead of removed backend brands.
@@ -71,6 +73,8 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 ## Compatibility Boundary
 
 - MCP tool names are preserved for OpenCrab compatibility.
+- The canonical CLI command is `littlecrab`.
+- The `little-crab` CLI name is preserved as a legacy alias.
 - The `opencrab` Python module namespace is preserved for compatibility.
 - User-facing MCP payload labels are not preserved when the old names imply removed infrastructure.
 - The payload rename from backend-brand labels to local-role labels is intentional and should be treated as a breaking change for downstream JSON consumers.

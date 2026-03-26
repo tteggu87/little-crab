@@ -13,8 +13,8 @@ This guide explains how to set up little-crab as an MCP server, where to place s
 
 ```bash
 python -m pip install -e ".[dev]"
-little-crab init
-little-crab status
+littlecrab init
+littlecrab status
 ```
 
 This creates `.env` and a local runtime directory such as `opencrab_data/`.
@@ -32,7 +32,7 @@ codex mcp add little-crab ^
   --env MCP_SERVER_NAME=little-crab ^
   --env MCP_SERVER_VERSION=0.1.0 ^
   --env LOG_LEVEL=WARNING ^
-  -- py -3.12 -m opencrab.cli serve
+  -- littlecrab serve
 ```
 
 Then check:
@@ -43,10 +43,23 @@ codex mcp list
 
 Open a new Codex session after registration so the MCP server is available to the agent.
 
+If the canonical `littlecrab` command is not on `PATH`, activate your virtualenv first or fall back to:
+
+```bash
+py -3.12 -m opencrab.cli serve
+```
+
 ## 3. Connect From Claude Code
 
 ```bash
+claude mcp add little-crab -- littlecrab serve
+```
+
+Compatibility aliases are still available:
+
+```bash
 claude mcp add little-crab -- little-crab serve
+claude mcp add little-crab -- opencrab serve
 ```
 
 ## 4. Recommended Project Layout
@@ -87,8 +100,8 @@ Do not treat `opencrab_data/` as a document folder. That is runtime state, not s
 ### Batch from disk
 
 ```bash
-little-crab ingest ./knowledge/inbox -r
-little-crab ingest ./knowledge/curated -r
+littlecrab ingest ./knowledge/inbox -r
+littlecrab ingest ./knowledge/curated -r
 ```
 
 ### Through an agent over MCP
@@ -161,6 +174,8 @@ Refinement requests:
 
 ## 9. Practical Notes
 
+- The canonical CLI command is `littlecrab`.
+- `little-crab` and `opencrab` remain available only as compatibility aliases.
 - little-crab는 local-only runtime입니다.
 - Docker, Neo4j, MongoDB, PostgreSQL 운영 경로는 현재 범위가 아닙니다.
 - 현재 extractor는 heuristic 중심이라, `model` 문자열이 보여도 외부 LLM extractor가 기본으로 도는 구조는 아닙니다.
@@ -168,7 +183,7 @@ Refinement requests:
 
 ## 10. First Session Checklist
 
-1. `little-crab status`
+1. `littlecrab status`
 2. MCP 연결 확인
 3. `ontology_manifest`
 4. `knowledge/inbox/` 문서 ingest

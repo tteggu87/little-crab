@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
+import tomllib
+
 from click.testing import CliRunner
 
 
@@ -23,3 +26,13 @@ def test_ingest_accepts_single_file_path(tmp_path):
 
     assert result.exit_code == 0
     assert "Ingested 1/1 files." in result.output
+
+
+def test_cli_entrypoint_aliases_are_declared() -> None:
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    project = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    scripts = project["project"]["scripts"]
+
+    assert scripts["littlecrab"] == "opencrab.cli:main"
+    assert scripts["little-crab"] == "opencrab.cli:main"
+    assert scripts["opencrab"] == "opencrab.cli:main"

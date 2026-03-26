@@ -1,6 +1,8 @@
 # little-crab
 
-[한국어 README](C:/python_Github/playground/little-crab/README.ko.md)
+[한국어 README](README.ko.md)
+
+![little-crab logo](logo.png)
 
 little-crab is a local-first fork of OpenCrab built to keep the original ontology grammar and agentic workflow while removing the heavy server database stack.
 
@@ -12,7 +14,7 @@ little-crab keeps the original MetaOntology grammar, validator behavior, MCP too
 - `DuckDB` for documents, audit events, registry, policies, impacts, and simulations
 - embedded `ChromaDB` for vectors
 
-The Python package name is `little-crab`. The CLI exposes both `little-crab` and `opencrab` entrypoints for compatibility.
+The Python package name is `little-crab`. The canonical CLI command is `littlecrab`. The legacy `little-crab` and `opencrab` commands remain available as compatibility aliases.
 
 ---
 
@@ -52,7 +54,7 @@ python -m pip install -e ".[dev]"
 ### 2. Initialize local config
 
 ```bash
-little-crab init
+littlecrab init
 ```
 
 This creates `.env` with:
@@ -69,7 +71,7 @@ LOG_LEVEL=INFO
 ### 3. Check embedded stores
 
 ```bash
-little-crab status
+littlecrab status
 ```
 
 ### 4. Seed example data
@@ -81,8 +83,8 @@ python scripts/seed_ontology.py
 ### 5. Run a query
 
 ```bash
-little-crab query "system performance and error rates"
-little-crab manifest
+littlecrab query "system performance and error rates"
+littlecrab manifest
 ```
 
 ### 6. Connect from Codex MCP
@@ -98,7 +100,7 @@ codex mcp add little-crab ^
   --env MCP_SERVER_NAME=little-crab ^
   --env MCP_SERVER_VERSION=0.1.0 ^
   --env LOG_LEVEL=WARNING ^
-  -- py -3.12 -m opencrab.cli serve
+  -- littlecrab serve
 ```
 
 Then verify:
@@ -109,15 +111,22 @@ codex mcp list
 
 Open a new Codex session after registration so the new MCP server is visible to the agent.
 
+If `littlecrab` is not on your `PATH`, activate your virtualenv first or use the compatibility fallback:
+
+```bash
+py -3.12 -m opencrab.cli serve
+```
+
 ### 7. Connect from Claude Code MCP
 
 ```bash
-claude mcp add little-crab -- little-crab serve
+claude mcp add little-crab -- littlecrab serve
 ```
 
-You can also keep using the compatibility alias:
+You can also keep using the compatibility aliases:
 
 ```bash
+claude mcp add little-crab -- little-crab serve
 claude mcp add little-crab -- opencrab serve
 ```
 
@@ -129,7 +138,7 @@ claude mcp add little-crab -- opencrab serve
 {
   "mcpServers": {
     "little-crab": {
-      "command": "little-crab",
+      "command": "littlecrab",
       "args": ["serve"],
       "env": {
         "LOCAL_DATA_DIR": "./opencrab_data"
@@ -166,8 +175,8 @@ Guidance:
 For batch ingestion from disk:
 
 ```bash
-little-crab ingest ./knowledge/inbox -r
-little-crab ingest ./knowledge/curated -r
+littlecrab ingest ./knowledge/inbox -r
+littlecrab ingest ./knowledge/curated -r
 ```
 
 For agent-driven work over MCP:
@@ -209,24 +218,25 @@ Useful prompt pattern:
 6. Add or refine nodes/edges as the ontology grows.
 7. Use ReBAC, impact, and lever simulation when you need analysis instead of retrieval.
 
-For a more detailed usage guide, see [docs/USAGE_GUIDE.md](/C:/python_Github/playground/little-crab/docs/USAGE_GUIDE.md).
+For a more detailed usage guide, see [docs/USAGE_GUIDE.md](docs/USAGE_GUIDE.md).
 
 ---
 
 ## CLI Reference
 
 ```text
-little-crab init              Create .env from template
-little-crab serve             Start MCP server (stdio)
-little-crab status            Check embedded store connections
-little-crab ingest <path>     Ingest files into vector store
-little-crab query <question>  Run a hybrid query
-little-crab manifest          Print MetaOntology grammar
+littlecrab init               Create .env from template
+littlecrab serve              Start MCP server (stdio)
+littlecrab status             Check embedded store connections
+littlecrab ingest <path>      Ingest files into vector store
+littlecrab query <question>   Run a hybrid query
+littlecrab manifest           Print MetaOntology grammar
 ```
 
-Compatibility alias:
+Compatibility aliases:
 
 ```text
+little-crab <same-command>
 opencrab <same-command>
 ```
 
@@ -264,6 +274,12 @@ py -3.12 scripts/dogfood_mcp.py --transcript-dir docs/evidence/agent_sessions/la
 ## Compatibility Note
 
 MCP tool names remain aligned with OpenCrab for compatibility.
+
+The canonical user-facing CLI command is `littlecrab`.
+
+- `littlecrab` is the preferred command in docs and examples.
+- `little-crab` remains as a legacy CLI alias.
+- `opencrab` remains as a compatibility CLI alias and Python module namespace.
 
 User-facing MCP payload labels were intentionally modernized to reflect the local runtime:
 
