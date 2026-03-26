@@ -1,4 +1,4 @@
-.PHONY: help install dev-install status serve query manifest lint format test coverage seed test-py312 coverage-py312 dogfood-mcp
+.PHONY: help install dev-install status serve query manifest lint format test coverage seed test-py312 coverage-py312 dogfood-mcp verify-intelligence
 
 PYTHON := python
 PIP    := pip
@@ -18,6 +18,7 @@ help:
 	@echo "  make format        Run black + isort"
 	@echo "  make test          Run test suite"
 	@echo "  make test-py312    Run canonical Python 3.12 test suite"
+	@echo "  make verify-intelligence  Check intelligence manifests against live code"
 	@echo "  make coverage      Run tests with coverage report"
 	@echo "  make dogfood-mcp   Run local stdio MCP dogfood scenarios"
 
@@ -51,6 +52,9 @@ test:
 
 test-py312:
 	py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py
+
+verify-intelligence:
+	$(PYTHON) scripts/verify_repo_intelligence.py
 
 coverage:
 	$(PYTEST) tests/ --cov=opencrab --cov-report=term-missing --cov-report=html

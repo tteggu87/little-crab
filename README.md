@@ -44,7 +44,7 @@ The Python package name is `little-crab`. The CLI exposes both `little-crab` and
 ### 1. Install
 
 ```bash
-py -3.12 -m pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 ```
 
 ### 2. Initialize local config
@@ -73,7 +73,7 @@ little-crab status
 ### 4. Seed example data
 
 ```bash
-py -3.12 scripts/seed_ontology.py
+python scripts/seed_ontology.py
 ```
 
 ### 5. Run a query
@@ -141,17 +141,34 @@ make dev-install
 make seed
 make status
 make test-py312
+make verify-intelligence
 make dogfood-mcp
 make lint
 make format
 ```
 
+Cross-platform examples above assume `python` resolves to a supported interpreter.
+
 Canonical Windows verification:
 
 ```bash
+py -3.12 scripts/verify_repo_intelligence.py
 py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py
 py -3.12 scripts/dogfood_mcp.py
 ```
+
+## Compatibility Note
+
+MCP tool names remain aligned with OpenCrab for compatibility.
+
+User-facing MCP payload labels were intentionally modernized to reflect the local runtime:
+
+- `stores.neo4j` -> `stores.graph`
+- `stores.mongodb` -> `stores.documents`
+- `stores.postgres` -> `stores.registry`
+- `stores.chromadb` -> `stores.vectors`
+
+This is an intentional breaking change in payload shape, not a signal that legacy service-backed databases still exist.
 
 ### Project structure
 

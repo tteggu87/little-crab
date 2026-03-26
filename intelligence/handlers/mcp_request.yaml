@@ -11,8 +11,8 @@ chain:
   - action: mcp.ontology_add_node
   - action: mcp.ontology_add_edge
   - action: mcp.ontology_query
-  - action: mcp.ontology_rebac_check
   - action: mcp.ontology_impact
+  - action: mcp.ontology_rebac_check
   - action: mcp.ontology_lever_simulate
   - action: mcp.ontology_extract
   - action: mcp.ontology_ingest

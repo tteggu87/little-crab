@@ -110,6 +110,18 @@ actions:
     notes:
       - "Exercises the stdio MCP surface end-to-end against a local data dir."
       - "Covers grammar inspection, graph growth, ingest/extract/query, rebac, impact, and lever simulation."
+  - key: script.verify_repo_intelligence
+    status: implemented
+    description: "Compare intelligence manifests against live CLI, MCP, and DuckDB code paths."
+    capability: script.verify_repo_intelligence
+    implementation: "scripts.verify_repo_intelligence:main"
+    writes_layers:
+      - Surface
+      - Documentation
+    touches_datasets: []
+    notes:
+      - "Treats docs and intelligence drift as a testable repository bug."
+      - "Verifies action keys, capability bindings, handler chain, and embedded table contracts."
   - key: mcp.ontology_manifest
     status: implemented
     description: "Return the grammar manifest over MCP."
