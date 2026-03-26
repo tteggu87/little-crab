@@ -48,6 +48,7 @@ entities:
       - mcp_surface
     used_by_actions:
       - cli.serve
+      - script.dogfood_mcp
       - mcp.ontology_manifest
       - mcp.ontology_add_node
       - mcp.ontology_add_edge

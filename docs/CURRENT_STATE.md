@@ -96,4 +96,6 @@ Last checked on 2026-03-26 with `py -3.12 -m pytest tests/test_cli.py tests/test
 - `tests/test_mcp.py` passed
 - `tests/test_cli.py` passed
 - fresh `LOCAL_DATA_DIR` smoke for `status -> seed -> query` passed
+- canonical MCP session evidence can now be regenerated with `py -3.12 scripts/dogfood_mcp.py --transcript-dir ...`
+- canonical MCP session evidence was generated into `docs/evidence/agent_sessions/2026-03-26-canonical`
 - in shells where `pytest` resolves to Python 3.10, use the Python 3.12 launcher form above as the canonical verification command

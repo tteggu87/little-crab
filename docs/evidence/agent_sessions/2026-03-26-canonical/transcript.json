@@ -1,0 +1,618 @@
+[
+  {
+    "index": 1,
+    "scenario": "bootstrap",
+    "method": "initialize",
+    "params": {},
+    "result": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {
+        "tools": {
+          "listChanged": false
+        }
+      },
+      "serverInfo": {
+        "name": "little-crab",
+        "version": "0.1.0"
+      },
+      "instructions": "OpenCrab exposes the MetaOntology OS grammar. Use ontology_manifest to explore the full grammar, then add nodes/edges and query the ontology."
+    }
+  },
+  {
+    "index": 2,
+    "scenario": "bootstrap",
+    "method": "tools/list",
+    "params": {},
+    "result": {
+      "tools": [
+        {
+          "name": "ontology_manifest",
+          "description": "Return the full MetaOntology OS grammar: spaces, meta-edges, impact categories, active metadata layers, and ReBAC config.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+          }
+        },
+        {
+          "name": "ontology_add_node",
+          "description": "Add or update a node in the MetaOntology graph.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "space": {
+                "type": "string",
+                "description": "MetaOntology space (e.g. subject, resource, concept)."
+              },
+              "node_type": {
+                "type": "string",
+                "description": "Node type within the space (e.g. User, Document)."
+              },
+              "node_id": {
+                "type": "string",
+                "description": "Stable unique identifier for the node."
+              },
+              "properties": {
+                "type": "object",
+                "description": "Optional key/value properties."
+              }
+            },
+            "required": [
+              "space",
+              "node_type",
+              "node_id"
+            ]
+          }
+        },
+        {
+          "name": "ontology_add_edge",
+          "description": "Add a directed edge between two nodes. Validates the relation against the MetaOntology grammar.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "from_space": {
+                "type": "string",
+                "description": "Source node space."
+              },
+              "from_id": {
+                "type": "string",
+                "description": "Source node ID."
+              },
+              "relation": {
+                "type": "string",
+                "description": "Relation label."
+              },
+              "to_space": {
+                "type": "string",
+                "description": "Target node space."
+              },
+              "to_id": {
+                "type": "string",
+                "description": "Target node ID."
+              },
+              "properties": {
+                "type": "object",
+                "description": "Optional edge properties."
+              }
+            },
+            "required": [
+              "from_space",
+              "from_id",
+              "relation",
+              "to_space",
+              "to_id"
+            ]
+          }
+        },
+        {
+          "name": "ontology_query",
+          "description": "Hybrid vector + graph search across the ontology.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "question": {
+                "type": "string",
+                "description": "Natural language query."
+              },
+              "spaces": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Optional list of spaces to filter results."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "Maximum number of results (default 10).",
+                "default": 10
+              }
+            },
+            "required": [
+              "question"
+            ]
+          }
+        },
+        {
+          "name": "ontology_impact",
+          "description": "Analyse the I1–I7 impact of a change to a node.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "node_id": {
+                "type": "string",
+                "description": "ID of the node being changed."
+              },
+              "change_type": {
+                "type": "string",
+                "description": "Type of change: create, update, delete, etc.",
+                "default": "update"
+              }
+            },
+            "required": [
+              "node_id"
+            ]
+          }
+        },
+        {
+          "name": "ontology_rebac_check",
+          "description": "Check whether a subject has a permission over a resource.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "subject_id": {
+                "type": "string",
+                "description": "Subject node ID."
+              },
+              "permission": {
+                "type": "string",
+                "description": "Permission: view, edit, execute, simulate, approve, admin."
+              },
+              "resource_id": {
+                "type": "string",
+                "description": "Resource node ID."
+              }
+            },
+            "required": [
+              "subject_id",
+              "permission",
+              "resource_id"
+            ]
+          }
+        },
+        {
+          "name": "ontology_lever_simulate",
+          "description": "Simulate downstream outcome changes from a lever movement.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "lever_id": {
+                "type": "string",
+                "description": "ID of the Lever node."
+              },
+              "direction": {
+                "type": "string",
+                "description": "Direction: raises, lowers, stabilizes, optimizes."
+              },
+              "magnitude": {
+                "type": "number",
+                "description": "Strength of the lever movement (0.0–1.0)."
+              }
+            },
+            "required": [
+              "lever_id",
+              "direction",
+              "magnitude"
+            ]
+          }
+        },
+        {
+          "name": "ontology_extract",
+          "description": "Extract ontology nodes and edges from text with the local heuristic extractor, then persist them into the knowledge graph.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Text to extract knowledge from."
+              },
+              "source_id": {
+                "type": "string",
+                "description": "Stable source identifier."
+              },
+              "model": {
+                "type": "string",
+                "description": "Claude model (default: claude-haiku-4-5-20251001).",
+                "default": "claude-haiku-4-5-20251001"
+              }
+            },
+            "required": [
+              "text",
+              "source_id"
+            ]
+          }
+        },
+        {
+          "name": "ontology_ingest",
+          "description": "Ingest a text document into the vector and document stores.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Text content to ingest."
+              },
+              "source_id": {
+                "type": "string",
+                "description": "Stable source identifier."
+              },
+              "metadata": {
+                "type": "object",
+                "description": "Optional metadata."
+              }
+            },
+            "required": [
+              "text",
+              "source_id"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "index": 3,
+    "scenario": "scenario_1_manifest_node_edge",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_manifest",
+      "arguments": {}
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"spaces\": {\"subject\": {\"description\": \"Actors and agents that have intentions and permissions.\", \"node_types\": [\"User\", \"Team\", \"Org\", \"Agent\"]}, \"resource\": {\"description\": \"Artifacts and tools that subjects act upon.\", \"node_types\": [\"Project\", \"Document\", \"File\", \"Dataset\", \"Tool\", \"API\"]}, \"evidence\": {\"description\": \"Raw observations, logs, and empirical records.\", \"node_types\": [\"TextUnit\", \"LogEntry\", \"Evidence\"]}, \"concept\": {\"description\": \"Abstract knowledge: entities, categories, and topics.\", \"node_types\": [\"Entity\", \"Concept\", \"Topic\", \"Class\"]}, \"claim\": {\"description\": \"Assertions derived from evidence.\", \"node_types\": [\"Claim\", \"Covariate\"]}, \"community\": {\"description\": \"Clusters of related concepts or actors.\", \"node_types\": [\"Community\", \"CommunityReport\"]}, \"outcome\": {\"description\": \"Measurable results, performance indicators, and risks.\", \"node_types\": [\"Outcome\", \"KPI\", \"Risk\"]}, \"lever\": {\"description\": \"Control variables that influence outcomes.\", \"node_types\": [\"Lever\"]}, \"policy\": {\"description\": \"Rules governing access, classification, and approval.\", \"node_types\": [\"Policy\", \"Sensitivity\", \"ApprovalRule\"]}}, \"meta_edges\": [{\"from_space\": \"subject\", \"to_space\": \"resource\", \"relations\": [\"owns\", \"member_of\", \"manages\", \"can_view\", \"can_edit\", \"can_execute\", \"can_approve\"], \"description\": \"Subjects hold permissions and roles over resources.\"}, {\"from_space\": \"resource\", \"to_space\": \"evidence\", \"relations\": [\"contains\", \"derived_from\", \"logged_as\"], \"description\": \"Resources produce or reference evidence.\"}, {\"from_space\": \"evidence\", \"to_space\": \"concept\", \"relations\": [\"mentions\", \"describes\", \"exemplifies\"], \"description\": \"Evidence surfaces conceptual knowledge.\"}, {\"from_space\": \"evidence\", \"to_space\": \"claim\", \"relations\": [\"supports\", \"contradicts\", \"timestamps\"], \"description\": \"Evidence grounds or challenges claims.\"}, {\"from_space\": \"concept\", \"to_space\": \"concept\", \"relations\": [\"related_to\", \"subclass_of\", \"part_of\", \"influences\", \"depends_on\"], \"description\": \"Inter-concept knowledge graph edges.\"}, {\"from_space\": \"concept\", \"to_space\": \"outcome\", \"relations\": [\"contributes_to\", \"constrains\", \"predicts\", \"degrades\"], \"description\": \"Concepts have causal or correlative links to outcomes.\"}, {\"from_space\": \"lever\", \"to_space\": \"outcome\", \"relations\": [\"raises\", \"lowers\", \"stabilizes\", \"optimizes\"], \"description\": \"Levers directly control outcome values.\"}, {\"from_space\": \"lever\", \"to_space\": \"concept\", \"relations\": [\"affects\"], \"description\": \"Levers influence conceptual state.\"}, {\"from_space\": \"community\", \"to_space\": \"concept\", \"relations\": [\"clusters\", \"summarizes\"], \"description\": \"Communities aggregate conceptual structure.\"}, {\"from_space\": \"policy\", \"to_space\": \"resource\", \"relations\": [\"protects\", \"classifies\", \"restricts\"], \"description\": \"Policies govern resource access and classification.\"}, {\"from_space\": \"policy\", \"to_space\": \"subject\", \"relations\": [\"permits\", \"denies\", \"requires_approval\"], \"description\": \"Policies define what subjects are allowed to do.\"}], \"impact_categories\": [{\"id\": \"I1\", \"name\": \"Data impact\", \"question\": \"What data values or records change?\"}, {\"id\": \"I2\", \"name\": \"Relation impact\", \"question\": \"What relationships or edges in the graph are affected?\"}, {\"id\": \"I3\", \"name\": \"Space impact\", \"question\": \"Which ontology spaces are touched by this change?\"}, {\"id\": \"I4\", \"name\": \"Permission impact\", \"question\": \"Which access permissions or ReBAC policies change?\"}, {\"id\": \"I5\", \"name\": \"Logic impact\", \"question\": \"Which business rules or inference chains are invalidated?\"}, {\"id\": \"I6\", \"name\": \"Cache/index impact\", \"question\": \"Which caches, indexes, or materialized views must be refreshed?\"}, {\"id\": \"I7\", \"name\": \"Downstream system impact\", \"question\": \"Which external systems or integrations are affected?\"}], \"active_metadata_layers\": {\"existence\": [\"identity\", \"provenance\", \"lineage\"], \"quality\": [\"confidence\", \"freshness\", \"completeness\"], \"relational\": [\"dependency\", \"sensitivity\", \"maturity\"], \"behavioral\": [\"usage\", \"mutation\", \"effect\"]}, \"rebac\": {\"object_types\": [\"user\", \"team\", \"org\", \"project\", \"document\", \"lever\", \"tool\"], \"permissions\": [\"view\", \"edit\", \"execute\", \"simulate\", \"approve\", \"admin\"]}}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 4,
+    "scenario": "scenario_1_manifest_node_edge",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_add_node",
+      "arguments": {
+        "space": "subject",
+        "node_type": "User",
+        "node_id": "dogfood-user",
+        "properties": {
+          "name": "Dogfood User"
+        }
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"node_id\": \"dogfood-user\", \"space\": \"subject\", \"node_type\": \"User\", \"properties\": {\"name\": \"Dogfood User\"}, \"stores\": {\"graph\": \"ok\", \"documents\": \"ok (id=subject::dogfood-user)\", \"registry\": \"ok\"}, \"node_data\": {\"name\": \"Dogfood User\", \"id\": \"dogfood-user\", \"space\": \"subject\", \"node_type\": \"User\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 5,
+    "scenario": "scenario_1_manifest_node_edge",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_add_node",
+      "arguments": {
+        "space": "resource",
+        "node_type": "Document",
+        "node_id": "dogfood-doc",
+        "properties": {
+          "name": "Dogfood Document"
+        }
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"node_id\": \"dogfood-doc\", \"space\": \"resource\", \"node_type\": \"Document\", \"properties\": {\"name\": \"Dogfood Document\"}, \"stores\": {\"graph\": \"ok\", \"documents\": \"ok (id=resource::dogfood-doc)\", \"registry\": \"ok\"}, \"node_data\": {\"name\": \"Dogfood Document\", \"id\": \"dogfood-doc\", \"space\": \"resource\", \"node_type\": \"Document\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 6,
+    "scenario": "scenario_1_manifest_node_edge",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_add_edge",
+      "arguments": {
+        "from_space": "subject",
+        "from_id": "dogfood-user",
+        "relation": "owns",
+        "to_space": "resource",
+        "to_id": "dogfood-doc"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"from\": {\"space\": \"subject\", \"id\": \"dogfood-user\"}, \"relation\": \"owns\", \"to\": {\"space\": \"resource\", \"id\": \"dogfood-doc\"}, \"stores\": {\"graph\": \"ok\", \"registry\": \"ok\", \"documents\": \"audited\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 7,
+    "scenario": "scenario_2_ingest_extract_query",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_ingest",
+      "arguments": {
+        "text": "Cache TTL tuning improved reliability and reduced stale reads for the analytics platform during peak traffic.",
+        "source_id": "dogfood-src-1",
+        "metadata": {
+          "space": "lever",
+          "node_id": "lever-cache-ttl"
+        }
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"source_id\": \"dogfood-src-1\", \"stores\": {\"vectors\": \"ok (id=dogfood-src-1)\", \"documents\": \"ok (id=dogfood-src-1)\"}, \"vector_id\": \"dogfood-src-1\", \"text_length\": 109, \"metadata\": {\"space\": \"lever\", \"node_id\": \"lever-cache-ttl\", \"source_id\": \"dogfood-src-1\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 8,
+    "scenario": "scenario_2_ingest_extract_query",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_extract",
+      "arguments": {
+        "text": "Cache TTL raises reliability for the analytics platform. Alice reviewed the resulting incident report.",
+        "source_id": "dogfood-extract-1"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"source_id\": \"dogfood-extract-1\", \"extractor_mode\": \"heuristic\", \"extracted_nodes\": 8, \"extracted_edges\": 7, \"added_nodes\": 8, \"added_edges\": 7, \"extraction_errors\": [], \"node_errors\": [], \"edge_errors\": []}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 9,
+    "scenario": "scenario_2_ingest_extract_query",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_query",
+      "arguments": {
+        "question": "cache ttl reliability",
+        "limit": 5
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"question\": \"cache ttl reliability\", \"spaces_filter\": null, \"total\": 1, \"results\": [{\"source\": \"vector\", \"node_id\": \"lever-cache-ttl\", \"score\": 0.7399940490722656, \"text\": \"Cache TTL tuning improved reliability and reduced stale reads for the analytics platform during peak traffic.\", \"metadata\": {\"space\": \"lever\", \"source_id\": \"dogfood-src-1\", \"node_id\": \"lever-cache-ttl\"}, \"graph_context\": null}]}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 10,
+    "scenario": "scenario_3_rebac_impact_simulation",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_add_node",
+      "arguments": {
+        "space": "subject",
+        "node_type": "User",
+        "node_id": "reviewer-user",
+        "properties": {
+          "name": "Reviewer User"
+        }
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"node_id\": \"reviewer-user\", \"space\": \"subject\", \"node_type\": \"User\", \"properties\": {\"name\": \"Reviewer User\"}, \"stores\": {\"graph\": \"ok\", \"documents\": \"ok (id=subject::reviewer-user)\", \"registry\": \"ok\"}, \"node_data\": {\"name\": \"Reviewer User\", \"id\": \"reviewer-user\", \"space\": \"subject\", \"node_type\": \"User\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 11,
+    "scenario": "scenario_3_rebac_impact_simulation",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_add_node",
+      "arguments": {
+        "space": "resource",
+        "node_type": "Dataset",
+        "node_id": "events-dataset",
+        "properties": {
+          "name": "Events Dataset"
+        }
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"node_id\": \"events-dataset\", \"space\": \"resource\", \"node_type\": \"Dataset\", \"properties\": {\"name\": \"Events Dataset\"}, \"stores\": {\"graph\": \"ok\", \"documents\": \"ok (id=resource::events-dataset)\", \"registry\": \"ok\"}, \"node_data\": {\"name\": \"Events Dataset\", \"id\": \"events-dataset\", \"space\": \"resource\", \"node_type\": \"Dataset\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 12,
+    "scenario": "scenario_3_rebac_impact_simulation",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_add_edge",
+      "arguments": {
+        "from_space": "subject",
+        "from_id": "reviewer-user",
+        "relation": "can_view",
+        "to_space": "resource",
+        "to_id": "events-dataset"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"from\": {\"space\": \"subject\", \"id\": \"reviewer-user\"}, \"relation\": \"can_view\", \"to\": {\"space\": \"resource\", \"id\": \"events-dataset\"}, \"stores\": {\"graph\": \"ok\", \"registry\": \"ok\", \"documents\": \"audited\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 13,
+    "scenario": "scenario_3_rebac_impact_simulation",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_rebac_check",
+      "arguments": {
+        "subject_id": "reviewer-user",
+        "permission": "view",
+        "resource_id": "events-dataset"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"granted\": true, \"reason\": \"Direct graph relationship [can_view] found.\", \"subject_id\": \"reviewer-user\", \"permission\": \"view\", \"resource_id\": \"events-dataset\", \"path\": [\"reviewer-user\", \"can_view\", \"events-dataset\"]}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 14,
+    "scenario": "scenario_3_rebac_impact_simulation",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_add_node",
+      "arguments": {
+        "space": "lever",
+        "node_type": "Lever",
+        "node_id": "cache-ttl-lever",
+        "properties": {
+          "name": "Cache TTL"
+        }
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"node_id\": \"cache-ttl-lever\", \"space\": \"lever\", \"node_type\": \"Lever\", \"properties\": {\"name\": \"Cache TTL\"}, \"stores\": {\"graph\": \"ok\", \"documents\": \"ok (id=lever::cache-ttl-lever)\", \"registry\": \"ok\"}, \"node_data\": {\"name\": \"Cache TTL\", \"id\": \"cache-ttl-lever\", \"space\": \"lever\", \"node_type\": \"Lever\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 15,
+    "scenario": "scenario_3_rebac_impact_simulation",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_add_node",
+      "arguments": {
+        "space": "outcome",
+        "node_type": "Outcome",
+        "node_id": "system-reliability",
+        "properties": {
+          "name": "System Reliability"
+        }
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"node_id\": \"system-reliability\", \"space\": \"outcome\", \"node_type\": \"Outcome\", \"properties\": {\"name\": \"System Reliability\"}, \"stores\": {\"graph\": \"ok\", \"documents\": \"ok (id=outcome::system-reliability)\", \"registry\": \"ok\"}, \"node_data\": {\"name\": \"System Reliability\", \"id\": \"system-reliability\", \"space\": \"outcome\", \"node_type\": \"Outcome\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 16,
+    "scenario": "scenario_3_rebac_impact_simulation",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_add_edge",
+      "arguments": {
+        "from_space": "lever",
+        "from_id": "cache-ttl-lever",
+        "relation": "raises",
+        "to_space": "outcome",
+        "to_id": "system-reliability"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"from\": {\"space\": \"lever\", \"id\": \"cache-ttl-lever\"}, \"relation\": \"raises\", \"to\": {\"space\": \"outcome\", \"id\": \"system-reliability\"}, \"stores\": {\"graph\": \"ok\", \"registry\": \"ok\", \"documents\": \"audited\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 17,
+    "scenario": "scenario_3_rebac_impact_simulation",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_impact",
+      "arguments": {
+        "node_id": "cache-ttl-lever",
+        "change_type": "update"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"node_id\": \"cache-ttl-lever\", \"change_type\": \"update\", \"space\": \"lever\", \"node_type\": \"Lever\", \"triggered_impacts\": [{\"id\": \"I1\", \"name\": \"Data impact\", \"question\": \"What data values or records change?\"}, {\"id\": \"I5\", \"name\": \"Logic impact\", \"question\": \"Which business rules or inference chains are invalidated?\"}, {\"id\": \"I6\", \"name\": \"Cache/index impact\", \"question\": \"Which caches, indexes, or materialized views must be refreshed?\"}, {\"id\": \"I7\", \"name\": \"Downstream system impact\", \"question\": \"Which external systems or integrations are affected?\"}, {\"id\": \"I3\", \"name\": \"Space impact\", \"question\": \"Which ontology spaces are touched by this change?\"}], \"affected_nodes\": [{\"properties\": {\"name\": \"System Reliability\", \"id\": \"system-reliability\", \"space\": \"outcome\", \"node_type\": \"Outcome\"}, \"labels\": [\"Outcome\"]}], \"affected_spaces\": [\"lever\", \"outcome\"], \"summary\": \"Change 'update' on node 'cache-ttl-lever' (space=lever) triggers: Data impact, Logic impact, Cache/index impact, Downstream system impact, Space impact. Affected spaces: lever, outcome.\"}"
+        }
+      ]
+    }
+  },
+  {
+    "index": 18,
+    "scenario": "scenario_3_rebac_impact_simulation",
+    "method": "tools/call",
+    "params": {
+      "name": "ontology_lever_simulate",
+      "arguments": {
+        "lever_id": "cache-ttl-lever",
+        "direction": "raises",
+        "magnitude": 0.7
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"lever_id\": \"cache-ttl-lever\", \"direction\": \"raises\", \"magnitude\": 0.7, \"predicted_outcome_changes\": [{\"node_id\": \"system-reliability\", \"node_type\": \"Outcome\", \"relation\": \"raises\", \"predicted_delta\": 0.7}], \"affected_concepts\": [], \"impact_categories\": [\"I5\", \"I7\"], \"confidence\": 0.815, \"note\": \"Lever 'cache-ttl-lever' moved in direction 'raises' with magnitude 0.70.\"}"
+        }
+      ]
+    }
+  }
+]

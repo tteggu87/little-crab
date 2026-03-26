@@ -157,6 +157,12 @@ py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py
 py -3.12 scripts/dogfood_mcp.py
 ```
 
+To refresh checked-in MCP session evidence:
+
+```bash
+py -3.12 scripts/dogfood_mcp.py --transcript-dir docs/evidence/agent_sessions/latest
+```
+
 ## Compatibility Note
 
 MCP tool names remain aligned with OpenCrab for compatibility.

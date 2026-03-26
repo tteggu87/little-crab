@@ -1,0 +1,82 @@
+{
+  "scenario": "scenario_2_ingest_extract_query",
+  "status": "pass",
+  "records": [
+    {
+      "index": 7,
+      "scenario": "scenario_2_ingest_extract_query",
+      "method": "tools/call",
+      "params": {
+        "name": "ontology_ingest",
+        "arguments": {
+          "text": "Cache TTL tuning improved reliability and reduced stale reads for the analytics platform during peak traffic.",
+          "source_id": "dogfood-src-1",
+          "metadata": {
+            "space": "lever",
+            "node_id": "lever-cache-ttl"
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"source_id\": \"dogfood-src-1\", \"stores\": {\"vectors\": \"ok (id=dogfood-src-1)\", \"documents\": \"ok (id=dogfood-src-1)\"}, \"vector_id\": \"dogfood-src-1\", \"text_length\": 109, \"metadata\": {\"space\": \"lever\", \"node_id\": \"lever-cache-ttl\", \"source_id\": \"dogfood-src-1\"}}"
+          }
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "scenario": "scenario_2_ingest_extract_query",
+      "method": "tools/call",
+      "params": {
+        "name": "ontology_extract",
+        "arguments": {
+          "text": "Cache TTL raises reliability for the analytics platform. Alice reviewed the resulting incident report.",
+          "source_id": "dogfood-extract-1"
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"source_id\": \"dogfood-extract-1\", \"extractor_mode\": \"heuristic\", \"extracted_nodes\": 8, \"extracted_edges\": 7, \"added_nodes\": 8, \"added_edges\": 7, \"extraction_errors\": [], \"node_errors\": [], \"edge_errors\": []}"
+          }
+        ]
+      }
+    },
+    {
+      "index": 9,
+      "scenario": "scenario_2_ingest_extract_query",
+      "method": "tools/call",
+      "params": {
+        "name": "ontology_query",
+        "arguments": {
+          "question": "cache ttl reliability",
+          "limit": 5
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"question\": \"cache ttl reliability\", \"spaces_filter\": null, \"total\": 1, \"results\": [{\"source\": \"vector\", \"node_id\": \"lever-cache-ttl\", \"score\": 0.7399940490722656, \"text\": \"Cache TTL tuning improved reliability and reduced stale reads for the analytics platform during peak traffic.\", \"metadata\": {\"space\": \"lever\", \"source_id\": \"dogfood-src-1\", \"node_id\": \"lever-cache-ttl\"}, \"graph_context\": null}]}"
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "ingest_store_roles": [
+      "documents",
+      "vectors"
+    ],
+    "extracted_nodes": 8,
+    "added_nodes": 8,
+    "query_total": 1,
+    "query_node_ids": [
+      "lever-cache-ttl"
+    ]
+  }
+}

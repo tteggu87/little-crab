@@ -26,6 +26,7 @@ On this repository's Windows setup, the canonical commands are:
 ```bash
 py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py
 py -3.12 scripts/dogfood_mcp.py
+py -3.12 scripts/dogfood_mcp.py --transcript-dir docs/evidence/agent_sessions/latest
 ```
 
 `make test-py312` and `make dogfood-mcp` are thin wrappers for the same checks.
@@ -99,6 +100,18 @@ The repeatable local harness lives at:
 - [scripts/dogfood_mcp.py](/C:/python_Github/playground/little-crab/scripts/dogfood_mcp.py)
 
 By default the script creates a temporary `LOCAL_DATA_DIR`, runs all three scenarios, prints `PASS` or `FAIL`, and removes the temp directory unless `--keep-data-dir` is supplied.
+
+If `--transcript-dir` is supplied, the script also writes sanitized JSON transcript files plus a Markdown summary that can be committed as agent-session evidence.
+
+## Checked-In Evidence
+
+Canonical evidence notes live at:
+
+- [AGENT_SESSION_EVIDENCE.md](/C:/python_Github/playground/little-crab/docs/AGENT_SESSION_EVIDENCE.md)
+
+Canonical session artifacts currently live under:
+
+- [docs/evidence/agent_sessions/2026-03-26-canonical](/C:/python_Github/playground/little-crab/docs/evidence/agent_sessions/2026-03-26-canonical)
 
 ## Failure Signals
 

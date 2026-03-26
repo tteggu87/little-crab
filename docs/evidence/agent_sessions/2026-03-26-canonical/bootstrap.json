@@ -1,0 +1,270 @@
+{
+  "scenario": "bootstrap",
+  "status": "pass",
+  "records": [
+    {
+      "index": 1,
+      "scenario": "bootstrap",
+      "method": "initialize",
+      "params": {},
+      "result": {
+        "protocolVersion": "2024-11-05",
+        "capabilities": {
+          "tools": {
+            "listChanged": false
+          }
+        },
+        "serverInfo": {
+          "name": "little-crab",
+          "version": "0.1.0"
+        },
+        "instructions": "OpenCrab exposes the MetaOntology OS grammar. Use ontology_manifest to explore the full grammar, then add nodes/edges and query the ontology."
+      }
+    },
+    {
+      "index": 2,
+      "scenario": "bootstrap",
+      "method": "tools/list",
+      "params": {},
+      "result": {
+        "tools": [
+          {
+            "name": "ontology_manifest",
+            "description": "Return the full MetaOntology OS grammar: spaces, meta-edges, impact categories, active metadata layers, and ReBAC config.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            }
+          },
+          {
+            "name": "ontology_add_node",
+            "description": "Add or update a node in the MetaOntology graph.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "space": {
+                  "type": "string",
+                  "description": "MetaOntology space (e.g. subject, resource, concept)."
+                },
+                "node_type": {
+                  "type": "string",
+                  "description": "Node type within the space (e.g. User, Document)."
+                },
+                "node_id": {
+                  "type": "string",
+                  "description": "Stable unique identifier for the node."
+                },
+                "properties": {
+                  "type": "object",
+                  "description": "Optional key/value properties."
+                }
+              },
+              "required": [
+                "space",
+                "node_type",
+                "node_id"
+              ]
+            }
+          },
+          {
+            "name": "ontology_add_edge",
+            "description": "Add a directed edge between two nodes. Validates the relation against the MetaOntology grammar.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "from_space": {
+                  "type": "string",
+                  "description": "Source node space."
+                },
+                "from_id": {
+                  "type": "string",
+                  "description": "Source node ID."
+                },
+                "relation": {
+                  "type": "string",
+                  "description": "Relation label."
+                },
+                "to_space": {
+                  "type": "string",
+                  "description": "Target node space."
+                },
+                "to_id": {
+                  "type": "string",
+                  "description": "Target node ID."
+                },
+                "properties": {
+                  "type": "object",
+                  "description": "Optional edge properties."
+                }
+              },
+              "required": [
+                "from_space",
+                "from_id",
+                "relation",
+                "to_space",
+                "to_id"
+              ]
+            }
+          },
+          {
+            "name": "ontology_query",
+            "description": "Hybrid vector + graph search across the ontology.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "question": {
+                  "type": "string",
+                  "description": "Natural language query."
+                },
+                "spaces": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Optional list of spaces to filter results."
+                },
+                "limit": {
+                  "type": "integer",
+                  "description": "Maximum number of results (default 10).",
+                  "default": 10
+                }
+              },
+              "required": [
+                "question"
+              ]
+            }
+          },
+          {
+            "name": "ontology_impact",
+            "description": "Analyse the I1–I7 impact of a change to a node.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "node_id": {
+                  "type": "string",
+                  "description": "ID of the node being changed."
+                },
+                "change_type": {
+                  "type": "string",
+                  "description": "Type of change: create, update, delete, etc.",
+                  "default": "update"
+                }
+              },
+              "required": [
+                "node_id"
+              ]
+            }
+          },
+          {
+            "name": "ontology_rebac_check",
+            "description": "Check whether a subject has a permission over a resource.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "subject_id": {
+                  "type": "string",
+                  "description": "Subject node ID."
+                },
+                "permission": {
+                  "type": "string",
+                  "description": "Permission: view, edit, execute, simulate, approve, admin."
+                },
+                "resource_id": {
+                  "type": "string",
+                  "description": "Resource node ID."
+                }
+              },
+              "required": [
+                "subject_id",
+                "permission",
+                "resource_id"
+              ]
+            }
+          },
+          {
+            "name": "ontology_lever_simulate",
+            "description": "Simulate downstream outcome changes from a lever movement.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "lever_id": {
+                  "type": "string",
+                  "description": "ID of the Lever node."
+                },
+                "direction": {
+                  "type": "string",
+                  "description": "Direction: raises, lowers, stabilizes, optimizes."
+                },
+                "magnitude": {
+                  "type": "number",
+                  "description": "Strength of the lever movement (0.0–1.0)."
+                }
+              },
+              "required": [
+                "lever_id",
+                "direction",
+                "magnitude"
+              ]
+            }
+          },
+          {
+            "name": "ontology_extract",
+            "description": "Extract ontology nodes and edges from text with the local heuristic extractor, then persist them into the knowledge graph.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Text to extract knowledge from."
+                },
+                "source_id": {
+                  "type": "string",
+                  "description": "Stable source identifier."
+                },
+                "model": {
+                  "type": "string",
+                  "description": "Claude model (default: claude-haiku-4-5-20251001).",
+                  "default": "claude-haiku-4-5-20251001"
+                }
+              },
+              "required": [
+                "text",
+                "source_id"
+              ]
+            }
+          },
+          {
+            "name": "ontology_ingest",
+            "description": "Ingest a text document into the vector and document stores.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Text content to ingest."
+                },
+                "source_id": {
+                  "type": "string",
+                  "description": "Stable source identifier."
+                },
+                "metadata": {
+                  "type": "object",
+                  "description": "Optional metadata."
+                }
+              },
+              "required": [
+                "text",
+                "source_id"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "server_name": "little-crab",
+    "tool_count": 9
+  }
+}
