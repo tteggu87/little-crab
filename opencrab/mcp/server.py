@@ -132,6 +132,10 @@ class MCPServer:
             return self._handle_tools_list(params)
         elif method == "tools/call":
             return self._handle_tools_call(params)
+        elif method == "resources/list":
+            return self._handle_resources_list(params)
+        elif method == "resources/templates/list":
+            return self._handle_resource_templates_list(params)
         elif method == "ping":
             return {"status": "ok", "server": self._name}
         else:
@@ -156,6 +160,7 @@ class MCPServer:
         return {
             "protocolVersion": protocol_version,
             "capabilities": {
+                "resources": {},
                 "tools": {"listChanged": False},
             },
             "serverInfo": {
@@ -172,6 +177,14 @@ class MCPServer:
     def _handle_tools_list(self, params: dict[str, Any]) -> dict[str, Any]:
         """Return the list of all available MCP tools."""
         return {"tools": TOOLS}
+
+    def _handle_resources_list(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Return the resources exposed by the server."""
+        return {"resources": []}
+
+    def _handle_resource_templates_list(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Return the parameterized resource templates exposed by the server."""
+        return {"resourceTemplates": []}
 
     def _handle_tools_call(self, params: dict[str, Any]) -> dict[str, Any]:
         """
