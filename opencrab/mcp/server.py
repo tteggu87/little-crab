@@ -83,8 +83,8 @@ class MCPServer:
     # Request handling
     # ------------------------------------------------------------------
 
-    def _handle_raw(self, raw: str) -> dict[str, Any] | None:
-        """Parse a raw JSON line and return a JSON-RPC response dict."""
+    def _handle_raw(self, raw: str) -> dict[str, Any] | list[dict[str, Any]] | None:
+        """Parse a raw JSON line and return a JSON-RPC response dict or batch."""
         if not raw or not raw.strip():
             return None
 
@@ -92,6 +92,24 @@ class MCPServer:
             request = json.loads(raw.lstrip("\ufeff"))
         except json.JSONDecodeError as exc:
             return self._error_response(None, PARSE_ERROR, f"Parse error: {exc}")
+
+        if isinstance(request, list):
+            if not request:
+                return self._error_response(None, INVALID_REQUEST, "Batch request must not be empty.")
+
+            responses: list[dict[str, Any]] = []
+            for item in request:
+                response = self._handle_message(item)
+                if response is not None:
+                    responses.append(response)
+            return responses or None
+
+        return self._handle_message(request)
+
+    def _handle_message(self, request: Any) -> dict[str, Any] | None:
+        """Process a single JSON-RPC request or notification."""
+        if not isinstance(request, dict):
+            return self._error_response(None, INVALID_REQUEST, "Request must be a JSON object.")
 
         has_id = "id" in request
         req_id = request.get("id")
@@ -102,7 +120,7 @@ class MCPServer:
 
         params = request.get("params") or {}
 
-        if not has_id and method.startswith("notifications/"):
+        if method.startswith("notifications/") and (not has_id or req_id is None):
             try:
                 self._dispatch(method, params)
             except Exception as exc:
