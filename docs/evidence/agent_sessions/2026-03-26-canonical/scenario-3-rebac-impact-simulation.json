@@ -1,0 +1,224 @@
+{
+  "scenario": "scenario_3_rebac_impact_simulation",
+  "status": "pass",
+  "records": [
+    {
+      "index": 10,
+      "scenario": "scenario_3_rebac_impact_simulation",
+      "method": "tools/call",
+      "params": {
+        "name": "ontology_add_node",
+        "arguments": {
+          "space": "subject",
+          "node_type": "User",
+          "node_id": "reviewer-user",
+          "properties": {
+            "name": "Reviewer User"
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"node_id\": \"reviewer-user\", \"space\": \"subject\", \"node_type\": \"User\", \"properties\": {\"name\": \"Reviewer User\"}, \"stores\": {\"graph\": \"ok\", \"documents\": \"ok (id=subject::reviewer-user)\", \"registry\": \"ok\"}, \"node_data\": {\"name\": \"Reviewer User\", \"id\": \"reviewer-user\", \"space\": \"subject\", \"node_type\": \"User\"}}"
+          }
+        ]
+      }
+    },
+    {
+      "index": 11,
+      "scenario": "scenario_3_rebac_impact_simulation",
+      "method": "tools/call",
+      "params": {
+        "name": "ontology_add_node",
+        "arguments": {
+          "space": "resource",
+          "node_type": "Dataset",
+          "node_id": "events-dataset",
+          "properties": {
+            "name": "Events Dataset"
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"node_id\": \"events-dataset\", \"space\": \"resource\", \"node_type\": \"Dataset\", \"properties\": {\"name\": \"Events Dataset\"}, \"stores\": {\"graph\": \"ok\", \"documents\": \"ok (id=resource::events-dataset)\", \"registry\": \"ok\"}, \"node_data\": {\"name\": \"Events Dataset\", \"id\": \"events-dataset\", \"space\": \"resource\", \"node_type\": \"Dataset\"}}"
+          }
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "scenario": "scenario_3_rebac_impact_simulation",
+      "method": "tools/call",
+      "params": {
+        "name": "ontology_add_edge",
+        "arguments": {
+          "from_space": "subject",
+          "from_id": "reviewer-user",
+          "relation": "can_view",
+          "to_space": "resource",
+          "to_id": "events-dataset"
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"from\": {\"space\": \"subject\", \"id\": \"reviewer-user\"}, \"relation\": \"can_view\", \"to\": {\"space\": \"resource\", \"id\": \"events-dataset\"}, \"stores\": {\"graph\": \"ok\", \"registry\": \"ok\", \"documents\": \"audited\"}}"
+          }
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "scenario": "scenario_3_rebac_impact_simulation",
+      "method": "tools/call",
+      "params": {
+        "name": "ontology_rebac_check",
+        "arguments": {
+          "subject_id": "reviewer-user",
+          "permission": "view",
+          "resource_id": "events-dataset"
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"granted\": true, \"reason\": \"Direct graph relationship [can_view] found.\", \"subject_id\": \"reviewer-user\", \"permission\": \"view\", \"resource_id\": \"events-dataset\", \"path\": [\"reviewer-user\", \"can_view\", \"events-dataset\"]}"
+          }
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "scenario": "scenario_3_rebac_impact_simulation",
+      "method": "tools/call",
+      "params": {
+        "name": "ontology_add_node",
+        "arguments": {
+          "space": "lever",
+          "node_type": "Lever",
+          "node_id": "cache-ttl-lever",
+          "properties": {
+            "name": "Cache TTL"
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"node_id\": \"cache-ttl-lever\", \"space\": \"lever\", \"node_type\": \"Lever\", \"properties\": {\"name\": \"Cache TTL\"}, \"stores\": {\"graph\": \"ok\", \"documents\": \"ok (id=lever::cache-ttl-lever)\", \"registry\": \"ok\"}, \"node_data\": {\"name\": \"Cache TTL\", \"id\": \"cache-ttl-lever\", \"space\": \"lever\", \"node_type\": \"Lever\"}}"
+          }
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "scenario": "scenario_3_rebac_impact_simulation",
+      "method": "tools/call",
+      "params": {
+        "name": "ontology_add_node",
+        "arguments": {
+          "space": "outcome",
+          "node_type": "Outcome",
+          "node_id": "system-reliability",
+          "properties": {
+            "name": "System Reliability"
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"node_id\": \"system-reliability\", \"space\": \"outcome\", \"node_type\": \"Outcome\", \"properties\": {\"name\": \"System Reliability\"}, \"stores\": {\"graph\": \"ok\", \"documents\": \"ok (id=outcome::system-reliability)\", \"registry\": \"ok\"}, \"node_data\": {\"name\": \"System Reliability\", \"id\": \"system-reliability\", \"space\": \"outcome\", \"node_type\": \"Outcome\"}}"
+          }
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "scenario": "scenario_3_rebac_impact_simulation",
+      "method": "tools/call",
+      "params": {
+        "name": "ontology_add_edge",
+        "arguments": {
+          "from_space": "lever",
+          "from_id": "cache-ttl-lever",
+          "relation": "raises",
+          "to_space": "outcome",
+          "to_id": "system-reliability"
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"from\": {\"space\": \"lever\", \"id\": \"cache-ttl-lever\"}, \"relation\": \"raises\", \"to\": {\"space\": \"outcome\", \"id\": \"system-reliability\"}, \"stores\": {\"graph\": \"ok\", \"registry\": \"ok\", \"documents\": \"audited\"}}"
+          }
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "scenario": "scenario_3_rebac_impact_simulation",
+      "method": "tools/call",
+      "params": {
+        "name": "ontology_impact",
+        "arguments": {
+          "node_id": "cache-ttl-lever",
+          "change_type": "update"
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"node_id\": \"cache-ttl-lever\", \"change_type\": \"update\", \"space\": \"lever\", \"node_type\": \"Lever\", \"triggered_impacts\": [{\"id\": \"I1\", \"name\": \"Data impact\", \"question\": \"What data values or records change?\"}, {\"id\": \"I5\", \"name\": \"Logic impact\", \"question\": \"Which business rules or inference chains are invalidated?\"}, {\"id\": \"I6\", \"name\": \"Cache/index impact\", \"question\": \"Which caches, indexes, or materialized views must be refreshed?\"}, {\"id\": \"I7\", \"name\": \"Downstream system impact\", \"question\": \"Which external systems or integrations are affected?\"}, {\"id\": \"I3\", \"name\": \"Space impact\", \"question\": \"Which ontology spaces are touched by this change?\"}], \"affected_nodes\": [{\"properties\": {\"name\": \"System Reliability\", \"id\": \"system-reliability\", \"space\": \"outcome\", \"node_type\": \"Outcome\"}, \"labels\": [\"Outcome\"]}], \"affected_spaces\": [\"lever\", \"outcome\"], \"summary\": \"Change 'update' on node 'cache-ttl-lever' (space=lever) triggers: Data impact, Logic impact, Cache/index impact, Downstream system impact, Space impact. Affected spaces: lever, outcome.\"}"
+          }
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "scenario": "scenario_3_rebac_impact_simulation",
+      "method": "tools/call",
+      "params": {
+        "name": "ontology_lever_simulate",
+        "arguments": {
+          "lever_id": "cache-ttl-lever",
+          "direction": "raises",
+          "magnitude": 0.7
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"lever_id\": \"cache-ttl-lever\", \"direction\": \"raises\", \"magnitude\": 0.7, \"predicted_outcome_changes\": [{\"node_id\": \"system-reliability\", \"node_type\": \"Outcome\", \"relation\": \"raises\", \"predicted_delta\": 0.7}], \"affected_concepts\": [], \"impact_categories\": [\"I5\", \"I7\"], \"confidence\": 0.815, \"note\": \"Lever 'cache-ttl-lever' moved in direction 'raises' with magnitude 0.70.\"}"
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "rebac_granted": true,
+    "impact_ids": [
+      "I1",
+      "I5",
+      "I6",
+      "I7",
+      "I3"
+    ],
+    "predicted_outcome_ids": [
+      "system-reliability"
+    ],
+    "simulation_confidence": 0.815
+  }
+}

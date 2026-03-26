@@ -18,6 +18,9 @@ Canonical docs and intelligence bootstrap were added:
 - [docs/ARCHITECTURE.md](/C:/python_Github/playground/little-crab/docs/ARCHITECTURE.md)
 - [docs/LAYERS.md](/C:/python_Github/playground/little-crab/docs/LAYERS.md)
 - [docs/MCP_DOGFOODING.md](/C:/python_Github/playground/little-crab/docs/MCP_DOGFOODING.md)
+- [docs/AGENT_SESSION_EVIDENCE.md](/C:/python_Github/playground/little-crab/docs/AGENT_SESSION_EVIDENCE.md)
+- [docs/USAGE_GUIDE.md](/C:/python_Github/playground/little-crab/docs/USAGE_GUIDE.md)
+- [docs/evidence/agent_sessions/2026-03-26-canonical](/C:/python_Github/playground/little-crab/docs/evidence/agent_sessions/2026-03-26-canonical)
 - [docs/SKILLS_INTEGRATION.md](/C:/python_Github/playground/little-crab/docs/SKILLS_INTEGRATION.md)
 - [docs/ROADMAP.md](/C:/python_Github/playground/little-crab/docs/ROADMAP.md)
 - [docs/IMPACT_SUMMARY.md](/C:/python_Github/playground/little-crab/docs/IMPACT_SUMMARY.md)
@@ -33,9 +36,11 @@ Canonical docs and intelligence bootstrap were added:
 - [intelligence/registry/capabilities.yaml](/C:/python_Github/playground/little-crab/intelligence/registry/capabilities.yaml)
 - [intelligence/schemas/duckdb_contracts.sql](/C:/python_Github/playground/little-crab/intelligence/schemas/duckdb_contracts.sql)
 - [scripts/dogfood_mcp.py](/C:/python_Github/playground/little-crab/scripts/dogfood_mcp.py)
+- [scripts/verify_repo_intelligence.py](/C:/python_Github/playground/little-crab/scripts/verify_repo_intelligence.py)
 - [Makefile](/C:/python_Github/playground/little-crab/Makefile)
 - [tests/test_mcp.py](/C:/python_Github/playground/little-crab/tests/test_mcp.py)
 - [tests/test_stores.py](/C:/python_Github/playground/little-crab/tests/test_stores.py)
+- [tests/test_repo_intelligence.py](/C:/python_Github/playground/little-crab/tests/test_repo_intelligence.py)
 
 ## Checked Not Changed
 
@@ -65,10 +70,22 @@ Canonical docs and intelligence bootstrap were added:
 - Added a minimal glossary for project/runtime vocabulary.
 - Added action, entity, dataset, capability, handler, policy, and schema manifests under `intelligence/`.
 - User-facing runtime payloads were aligned to local role names: `graph`, `documents`, `registry`, and `vectors`.
+- The payload label rename is intentional and should be treated as a breaking change for consumers that parse `stores.*` keys directly.
+- Added a repeatable repository intelligence consistency check driven from live CLI, MCP, and DuckDB code paths.
+- Added repeatable MCP session evidence capture from the local stdio server via `--transcript-dir`.
+
+Payload migration map:
+
+- `stores.neo4j` -> `stores.graph`
+- `stores.mongodb` -> `stores.documents`
+- `stores.postgres` -> `stores.registry`
+- `stores.chromadb` -> `stores.vectors`
 
 ## Validator Summary
 
 - Validator run from the bootstrap skill completed after the docs/intelligence pass.
 - Current expectation is validator-clean except for the warning emitted when no changed-files list is supplied.
 - Runtime verification was rechecked on 2026-03-26 with `py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py` and all 68 tests passed.
+- Repository intelligence verification is now automated via `scripts/verify_repo_intelligence.py`.
 - The repeatable local MCP dogfood path is now documented in `docs/MCP_DOGFOODING.md` and automated via `scripts/dogfood_mcp.py`.
+- Checked-in agent-session evidence is now documented in `docs/AGENT_SESSION_EVIDENCE.md`.

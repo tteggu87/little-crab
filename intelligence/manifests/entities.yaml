@@ -35,6 +35,7 @@ entities:
       - local_first_runtime
     used_by_actions:
       - cli.status
+      - script.verify_repo_intelligence
       - script.dogfood_mcp
       - script.seed
   - key: grammar_manifest
@@ -47,6 +48,7 @@ entities:
       - mcp_surface
     used_by_actions:
       - cli.serve
+      - script.dogfood_mcp
       - mcp.ontology_manifest
       - mcp.ontology_add_node
       - mcp.ontology_add_edge

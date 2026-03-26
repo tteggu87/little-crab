@@ -29,6 +29,9 @@ capabilities:
   - key: script.dogfood_mcp
     status: active
     implementation: "scripts.dogfood_mcp:main"
+  - key: script.verify_repo_intelligence
+    status: active
+    implementation: "scripts.verify_repo_intelligence:main"
   - key: mcp.ontology_manifest
     status: active
     implementation: "opencrab.mcp.tools:ontology_manifest"

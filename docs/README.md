@@ -28,6 +28,11 @@ OpenCrab was worth preserving because it gave agents a bounded but flexible onto
 - [2026-03-26-lancedb-evaluation.md](/C:/python_Github/playground/little-crab/docs/2026-03-26-lancedb-evaluation.md)
 - [2026-03-26-polaris-adaptation-for-little-crab.md](/C:/python_Github/playground/little-crab/docs/2026-03-26-polaris-adaptation-for-little-crab.md)
 
+## Supporting Evidence
+
+- [AGENT_SESSION_EVIDENCE.md](/C:/python_Github/playground/little-crab/docs/AGENT_SESSION_EVIDENCE.md)
+- [USAGE_GUIDE.md](/C:/python_Github/playground/little-crab/docs/USAGE_GUIDE.md)
+
 ## Source Of Truth Map
 
 - Package metadata and script registration: [pyproject.toml](/C:/python_Github/playground/little-crab/pyproject.toml)
@@ -49,6 +54,9 @@ The retained compatibility surface is package/module naming:
 - package name: `little-crab`
 - module namespace: `opencrab`
 - CLI commands: `little-crab`, `opencrab`
+- MCP tool names remain aligned with OpenCrab
+
+Compatibility does not require keeping removed backend brand names in user-facing payloads. Runtime payloads now use local-role labels such as `graph`, `documents`, `registry`, and `vectors`.
 
 ## Project Intent
 
