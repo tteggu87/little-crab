@@ -273,6 +273,84 @@ class TestToolDispatch:
             assert result["added_nodes"] >= 2
             assert result["added_edges"] >= 1
 
+    def test_reset_runtime_state_rebuilds_context(self, monkeypatch, tmp_path):
+        from opencrab.mcp.tools import _get_context, reset_runtime_state
+
+        first_dir = tmp_path / "first"
+        second_dir = tmp_path / "second"
+
+        monkeypatch.setenv("LOCAL_DATA_DIR", str(first_dir))
+        monkeypatch.setenv("CHROMA_COLLECTION", "reset-test-a")
+        reset_runtime_state()
+        first_ctx = _get_context()
+
+        monkeypatch.setenv("LOCAL_DATA_DIR", str(second_dir))
+        monkeypatch.setenv("CHROMA_COLLECTION", "reset-test-b")
+        reset_runtime_state()
+        second_ctx = _get_context()
+
+        assert first_ctx is not second_ctx
+        assert first_ctx["graph"] is not second_ctx["graph"]
+        assert first_ctx["documents"] is not second_ctx["documents"]
+        assert first_ctx["vectors"] is not second_ctx["vectors"]
+        assert first_ctx["context_pipeline"] is not second_ctx["context_pipeline"]
+        assert second_ctx["vectors"].location == str(second_dir / "chroma")
+
+    def test_agent_context_pipeline_builds_bundle(self):
+        from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
+        from opencrab.ontology.query import QueryResult
+
+        hybrid = MagicMock()
+        hybrid.query.return_value = [
+            QueryResult(
+                source="vector",
+                node_id="n1",
+                score=0.9,
+                text="Vector fact",
+                metadata={"source_id": "src-1", "space": "evidence"},
+            ),
+            QueryResult(
+                source="graph",
+                node_id="n2",
+                score=0.5,
+                text="Graph fact",
+                metadata={"space": "concept"},
+                graph_context={"anchor_id": "n1", "labels": ["Concept"]},
+            ),
+        ]
+        pipeline = AgentContextPipeline(hybrid)
+
+        bundle = pipeline.build_context(AgentContextRequest(question="cache ttl"))
+        payload = bundle.to_dict()
+
+        assert len(bundle.facts) == 2
+        assert payload["scope"]["graph_expansion_enabled"] is True
+        assert payload["supporting_evidence"][0]["ref"] == "src-1"
+        assert payload["provenance_paths"][0]["nodes"] == ["n1", "n2"]
+        assert payload["inferred_links"][0]["relation"] == "neighbor_of"
+        assert payload["raw_refs"][0]["ref_type"] == "node"
+
+    def test_agent_context_pipeline_emits_missing_links_for_empty_scope(self):
+        from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
+
+        hybrid = MagicMock()
+        hybrid.query.return_value = []
+        pipeline = AgentContextPipeline(hybrid)
+
+        bundle = pipeline.build_context(
+            AgentContextRequest(
+                question="unknown topic",
+                project="alpha",
+                source_id_prefix="docs/",
+            )
+        )
+        payload = bundle.to_dict()
+
+        assert payload["facts"] == []
+        assert payload["missing_links"][0]["kind"] == "no_match"
+        assert payload["missing_links"][1]["kind"] == "scope_constrained_graph_expansion"
+        assert payload["uncertainty"]["scope_filters_active"] is True
+
 
 # ---------------------------------------------------------------------------
 # MCP Server protocol tests
@@ -306,15 +384,22 @@ class TestMCPServer:
         assert response["error"]["code"] == -32601  # METHOD_NOT_FOUND
 
     def test_handle_initialize(self, server):
-        request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+        request = json.dumps({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"protocolVersion": "2025-11-25"},
+        })
         response = server._handle_raw(request)
         assert response["id"] == 1
         result = response["result"]
         assert "protocolVersion" in result
+        assert result["protocolVersion"] == "2025-11-25"
         assert "serverInfo" in result
         assert result["serverInfo"]["name"] == "opencrab-test"
         assert "capabilities" in result
         assert "tools" in result["capabilities"]
+        assert "resources" in result["capabilities"]
 
     def test_handle_tools_list(self, server):
         request = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
@@ -323,6 +408,49 @@ class TestMCPServer:
         assert "tools" in response["result"]
         tools = response["result"]["tools"]
         assert len(tools) == 9
+
+    def test_handle_initialized_notification_without_id_returns_none(self, server):
+        request = json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        response = server._handle_raw(request)
+        assert response is None
+
+    def test_handle_initialized_notification_with_null_id_returns_none(self, server):
+        request = json.dumps({"jsonrpc": "2.0", "id": None, "method": "notifications/initialized"})
+        response = server._handle_raw(request)
+        assert response is None
+
+    def test_handle_resources_list(self, server):
+        request = json.dumps({"jsonrpc": "2.0", "id": 7, "method": "resources/list", "params": {}})
+        response = server._handle_raw(request)
+        assert response["id"] == 7
+        assert response["result"]["resources"] == []
+
+    def test_handle_resource_templates_list(self, server):
+        request = json.dumps({
+            "jsonrpc": "2.0",
+            "id": 8,
+            "method": "resources/templates/list",
+            "params": {},
+        })
+        response = server._handle_raw(request)
+        assert response["id"] == 8
+        assert response["result"]["resourceTemplates"] == []
+
+    def test_handle_batch_request(self, server):
+        batch = json.dumps(
+            [
+                {"jsonrpc": "2.0", "method": "notifications/initialized"},
+                {"jsonrpc": "2.0", "id": 9, "method": "resources/list", "params": {}},
+                {"jsonrpc": "2.0", "id": 10, "method": "resources/templates/list", "params": {}},
+            ]
+        )
+        response = server._handle_raw(batch)
+        assert isinstance(response, list)
+        assert len(response) == 2
+        assert response[0]["id"] == 9
+        assert response[0]["result"]["resources"] == []
+        assert response[1]["id"] == 10
+        assert response[1]["result"]["resourceTemplates"] == []
 
     def test_handle_tools_call_manifest(self, server):
         request = json.dumps({
@@ -422,6 +550,21 @@ class TestOntologyBuilder:
         result = builder.add_edge("subject", "u1", "owns", "resource", "p1")
         assert result["relation"] == "owns"
         assert result["stores"]["registry"] == "ok"
+
+    def test_add_edge_missing_nodes_skips_registry_and_logs_failure(self, builder):
+        result = builder.add_edge("subject", "u1", "owns", "resource", "p1")
+
+        assert result["stores"]["graph"] == "no match"
+        assert result["stores"]["registry"] == "skipped (graph edge not persisted)"
+        assert result["stores"]["documents"] == "failure_audited"
+
+        counts = builder._sql.table_counts()
+        assert counts["ontology_edges"] == 0
+
+        events = builder._mongo.get_audit_log()
+        assert len(events) == 1
+        assert events[0]["event_type"] == "edge_upsert_failed"
+        assert events[0]["details"]["graph_status"] == "no match"
 
     def test_add_edge_invalid_relation(self, builder):
         with pytest.raises(ValueError):

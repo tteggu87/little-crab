@@ -41,6 +41,7 @@ def _get_context() -> dict[str, Any]:
 
     from opencrab.config import get_settings
     from opencrab.ontology.builder import OntologyBuilder
+    from opencrab.ontology.context_pipeline import AgentContextPipeline
     from opencrab.ontology.impact import ImpactEngine
     from opencrab.ontology.query import HybridQuery
     from opencrab.ontology.rebac import ReBACEngine
@@ -57,6 +58,7 @@ def _get_context() -> dict[str, Any]:
     rebac = ReBACEngine(graph, sql)
     impact = ImpactEngine(graph, sql)
     hybrid = HybridQuery(vector, graph)
+    context_pipeline = AgentContextPipeline(hybrid, docs, sql)
 
     _context = {
         "graph": graph,
@@ -67,8 +69,21 @@ def _get_context() -> dict[str, Any]:
         "rebac": rebac,
         "impact": impact,
         "hybrid": hybrid,
+        "context_pipeline": context_pipeline,
     }
     return _context
+
+
+def reset_runtime_state() -> None:
+    """Clear cached settings, stores, and tool context for in-process reloads."""
+    global _context
+
+    from opencrab.config import reset_settings_cache
+    from opencrab.stores.factory import reset_store_caches
+
+    _context = {}
+    reset_settings_cache()
+    reset_store_caches()
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +188,8 @@ def ontology_query(
     question: str,
     spaces: list[str] | None = None,
     limit: int = 10,
+    project: str | None = None,
+    source_id_prefix: str | None = None,
 ) -> dict[str, Any]:
     """
     Run a hybrid vector + graph query against the ontology.
@@ -185,6 +202,10 @@ def ontology_query(
         Optional list of space IDs to restrict the search.
     limit:
         Maximum number of results.
+    project:
+        Optional project metadata filter used to scope vector results.
+    source_id_prefix:
+        Optional source_id prefix used to scope vector results.
     """
     ctx = _get_context()
     try:
@@ -192,10 +213,15 @@ def ontology_query(
             question=question,
             spaces=spaces,
             limit=limit,
+            project=project,
+            source_id_prefix=source_id_prefix,
         )
         return {
             "question": question,
             "spaces_filter": spaces,
+            "project_filter": project,
+            "source_id_prefix_filter": source_id_prefix,
+            "graph_expansion": not bool(project or source_id_prefix),
             "total": len(results),
             "results": [r.to_dict() for r in results],
         }
@@ -496,6 +522,14 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "type": "integer",
                     "description": "Maximum number of results (default 10).",
                     "default": 10,
+                },
+                "project": {
+                    "type": "string",
+                    "description": "Optional project metadata filter.",
+                },
+                "source_id_prefix": {
+                    "type": "string",
+                    "description": "Optional source_id prefix filter.",
                 },
             },
             "required": ["question"],

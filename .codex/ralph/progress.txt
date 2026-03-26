@@ -1,0 +1,38 @@
+# Ralph Handoff Progress
+
+Project: little-crab agent context pipeline
+Branch: codex/agent-context-pipeline
+Status: planned, not started
+
+## Codebase Patterns
+
+- External canonical CLI entrypoint is `littlecrab`, implemented by `opencrab.cli:main`.
+- MCP stdio and CLI share the same local runtime.
+- Current live store ownership is distributed:
+  - Ladybug for ontology graph truth
+  - DuckDB for documentary/provenance/registry/policy truth
+  - Chroma for derived retrieval indexing
+- `opencrab.mcp.tools` currently assembles engines directly from cached stores.
+- `ontology_query` is the best first read path to route through a single context pipeline.
+- Scoped filters already intentionally suppress graph expansion and must keep doing so.
+
+## Story Order
+
+1. ACP-1 define contract and pipeline
+2. ACP-2 route ontology_query through the pipeline
+3. ACP-3 enrich provenance/gap/policy context
+4. ACP-4 sync docs/intelligence and dogfood verification
+
+## Notes
+
+- Do not create a second SSOT.
+- The new pipeline must stay read-only.
+- Preserve MCP tool names and current compatibility aliases.
+
+## 2026-03-27 15:18 - ACP-1
+- Implemented a new read-only `AgentContextPipeline` with explicit request/bundle contracts for agent-facing context assembly.
+- Wired the pipeline into the internal MCP runtime context without changing public MCP tool behavior yet.
+- Files changed: `.codex/ralph/prd.json`, `opencrab/ontology/context_pipeline.py`, `opencrab/ontology/__init__.py`, `opencrab/mcp/tools.py`, `tests/test_mcp.py`
+- Quality checks run and result: `py -3.12 -m pytest tests/test_mcp.py tests/test_stores.py` passed (77 tests).
+- Learnings for future iterations: the pipeline can stay thin if it only shapes read-only bundles and defers store-specific enrichment to later stories.
+---
