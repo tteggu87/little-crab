@@ -3,9 +3,17 @@ policies:
     rule: "little-crab is local-only."
   preserve_opencrab_semantics:
     rule: "Preserve OpenCrab grammar, validator behavior, MCP tool naming, and the agentic ontology growth loop unless an explicit architecture decision says otherwise."
+  preserve_opencrab_flexibility:
+    rule: "Preserve OpenCrab flexibility as an explicit goal: keep partial knowledge visible enough for later gap-filling, avoid ASCII-only query assumptions, and preserve provenance depth sufficient to explain multi-step reasoning."
   compatibility_namespace:
     rule: "opencrab module naming is intentional compatibility, not live legacy storage."
+  edge_registry_truth:
+    rule: "Registry rows and successful edge audit events must only be emitted after the graph edge itself persists; failed graph writes should be recorded as failed attempts instead of live edges."
+  derived_agent_context:
+    rule: "Agent-facing context bundles are derived, read-only outputs assembled from live local stores and must not become a second canonical source-of-truth."
   docs_sync:
     rule: "Changes to CLI, MCP, grammar, or stores require docs updates in the same task."
   no_service_stack:
     rule: "Do not reintroduce service-backed DB infrastructure without explicit architecture review."
+  scoped_query_scope:
+    rule: "When query scope filters such as project or source_id_prefix are active, vector retrieval must stay inside scope and graph expansion must not escape that scope."

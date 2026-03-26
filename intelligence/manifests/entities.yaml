@@ -1,7 +1,7 @@
 metadata:
   status: Active
   source_of_truth: false
-  last_updated: 2026-03-26
+  last_updated: 2026-03-27
   purpose: "Repository-level named entities for docs and runtime alignment."
 
 entities:
@@ -30,6 +30,29 @@ entities:
       - cli.serve
       - mcp.ontology_manifest
       - mcp.ontology_query
+  - key: opencrab_flexibility_goal
+    canonical_terms:
+      - opencrab_flexibility
+      - partial_knowledge_visibility
+      - non_english_query_viability
+      - provenance_depth
+    used_by_actions:
+      - cli.query
+      - cli.serve
+      - mcp.ontology_query
+      - mcp.ontology_extract
+      - script.dogfood_mcp
+      - script.verify_repo_intelligence
+  - key: agent_context_contract
+    canonical_terms:
+      - agent_context_pipeline
+      - derived_agent_context
+      - provenance_depth
+      - partial_knowledge_visibility
+    used_by_actions:
+      - mcp.ontology_query
+      - cli.query
+      - script.dogfood_mcp
   - key: embedded_runtime
     canonical_terms:
       - local_first_runtime

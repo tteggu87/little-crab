@@ -52,3 +52,11 @@ Status: planned, not started
 - Quality checks run and result: `py -3.12 -m pytest tests/test_mcp.py tests/test_stores.py` passed (78 tests).
 - Learnings for future iterations: provenance and gap reporting stay understandable when the bundle distinguishes store-backed evidence from graph-only inference instead of flattening everything into one result list.
 ---
+
+## 2026-03-27 15:31 - ACP-4
+- Synced canonical docs and lightweight intelligence so the new cognition-vs-truth boundary is explicit: distributed canonical truth in Ladybug/DuckDB, derived read-only agent context in `AgentContextPipeline`.
+- Updated docs and handlers to describe `ontology_query` as a compatibility-preserving response that now includes a derived `context` bundle.
+- Files changed: `.codex/ralph/prd.json`, `docs/CURRENT_STATE.md`, `docs/ARCHITECTURE.md`, `docs/LAYERS.md`, `docs/README.md`, `docs/ROADMAP.md`, `docs/IMPACT_SUMMARY.md`, `intelligence/glossary.yaml`, `intelligence/manifests/entities.yaml`, `intelligence/handlers/mcp_request.yaml`, `intelligence/policies/repo_rules.yaml`
+- Quality checks run and result: `py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py` passed (81 tests), `py -3.12 scripts/verify_repo_intelligence.py` passed, `py -3.12 scripts/dogfood_mcp.py --transcript-dir .codex/ralph/archive/agent-context-dogfood` passed.
+- Learnings for future iterations: the repo stays easier to reason about when docs say plainly that “single agent ingress” does not mean “single storage truth.”
+---

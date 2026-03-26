@@ -1,7 +1,7 @@
 ---
 status: Active
 source_of_truth: No
-last_updated: 2026-03-26
+last_updated: 2026-03-27
 superseded_by: N/A
 ---
 
@@ -24,6 +24,7 @@ Canonical docs and intelligence bootstrap were added:
 - [docs/SKILLS_INTEGRATION.md](/C:/python_Github/playground/little-crab/docs/SKILLS_INTEGRATION.md)
 - [docs/ROADMAP.md](/C:/python_Github/playground/little-crab/docs/ROADMAP.md)
 - [docs/IMPACT_SUMMARY.md](/C:/python_Github/playground/little-crab/docs/IMPACT_SUMMARY.md)
+- [opencrab/ontology/context_pipeline.py](/C:/python_Github/playground/little-crab/opencrab/ontology/context_pipeline.py)
 - [opencrab/mcp/tools.py](/C:/python_Github/playground/little-crab/opencrab/mcp/tools.py)
 - [opencrab/ontology/builder.py](/C:/python_Github/playground/little-crab/opencrab/ontology/builder.py)
 - [opencrab/ontology/query.py](/C:/python_Github/playground/little-crab/opencrab/ontology/query.py)
@@ -50,10 +51,12 @@ Canonical docs and intelligence bootstrap were added:
 ## Current vs Legacy Split
 
 - Current:
-  - local-only runtime
-  - LadybugDB + DuckDB + embedded ChromaDB
-  - `little-crab` package name
-  - `opencrab` module compatibility namespace
+- local-only runtime
+- LadybugDB + DuckDB + embedded ChromaDB
+- distributed canonical truth ownership across Ladybug and DuckDB
+- read-only derived agent context assembly through `AgentContextPipeline`
+- `little-crab` package name
+- `opencrab` module compatibility namespace
 - Legacy retained intentionally:
   - naming continuity from OpenCrab in grammar and module paths
 - Legacy removed:
@@ -70,6 +73,7 @@ Canonical docs and intelligence bootstrap were added:
 - Added a minimal glossary for project/runtime vocabulary.
 - Added action, entity, dataset, capability, handler, policy, and schema manifests under `intelligence/`.
 - User-facing runtime payloads were aligned to local role names: `graph`, `documents`, `registry`, and `vectors`.
+- Added a read-only agent context bundle layer for MCP query responses without introducing a second source-of-truth.
 - The payload label rename is intentional and should be treated as a breaking change for consumers that parse `stores.*` keys directly.
 - Added a repeatable repository intelligence consistency check driven from live CLI, MCP, and DuckDB code paths.
 - Added repeatable MCP session evidence capture from the local stdio server via `--transcript-dir`.
@@ -85,7 +89,7 @@ Payload migration map:
 
 - Validator run from the bootstrap skill completed after the docs/intelligence pass.
 - Current expectation is validator-clean except for the warning emitted when no changed-files list is supplied.
-- Runtime verification was rechecked on 2026-03-26 with `py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py` and all 68 tests passed.
+- Runtime verification was rechecked on 2026-03-27 with `py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py` and all 78 tests passed.
 - Repository intelligence verification is now automated via `scripts/verify_repo_intelligence.py`.
 - The repeatable local MCP dogfood path is now documented in `docs/MCP_DOGFOODING.md` and automated via `scripts/dogfood_mcp.py`.
 - Checked-in agent-session evidence is now documented in `docs/AGENT_SESSION_EVIDENCE.md`.

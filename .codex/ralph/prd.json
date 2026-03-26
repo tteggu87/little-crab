@@ -69,7 +69,7 @@
         "Dogfood and regression checks cover context shape and scope behavior."
       ],
       "priority": "medium",
-      "passes": false,
+      "passes": true,
       "checks": [
         "py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py",
         "py -3.12 scripts/verify_repo_intelligence.py"
