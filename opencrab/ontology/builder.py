@@ -205,46 +205,80 @@ class OntologyBuilder:
             except Exception:
                 pass  # use defaults
 
+        graph_persisted = False
+        graph_status = "unavailable"
+
         # --- Graph write ---
         if self._neo4j.available:
             try:
                 ok = self._neo4j.upsert_edge(from_type, from_id, relation, to_type, to_id, props)
-                output["stores"]["graph"] = "ok" if ok else "no match"
+                graph_persisted = bool(ok)
+                graph_status = "ok" if ok else "no match"
+                output["stores"]["graph"] = graph_status
             except Exception as exc:
                 logger.warning("Graph edge write failed: %s", exc)
-                output["stores"]["graph"] = f"error: {exc}"
+                graph_status = f"error: {exc}"
+                output["stores"]["graph"] = graph_status
         else:
-            output["stores"]["graph"] = "unavailable"
+            output["stores"]["graph"] = graph_status
 
         # --- Registry write ---
-        if self._sql.available:
+        if graph_persisted and self._sql.available:
             try:
                 self._sql.register_edge(from_space, from_id, relation, to_space, to_id)
                 output["stores"]["registry"] = "ok"
             except Exception as exc:
                 logger.warning("SQL edge registry failed: %s", exc)
                 output["stores"]["registry"] = f"error: {exc}"
+        elif self._sql.available:
+            output["stores"]["registry"] = "skipped (graph edge not persisted)"
         else:
             output["stores"]["registry"] = "unavailable"
 
         # --- Document/audit write ---
         if self._mongo.available:
-            self._mongo.log_event(
-                "edge_upsert",
-                subject_id=None,
-                details={
-                    "from_space": from_space,
-                    "from_id": from_id,
-                    "relation": relation,
-                    "to_space": to_space,
-                    "to_id": to_id,
-                },
-            )
-            output["stores"]["documents"] = "audited"
+            event_type = "edge_upsert" if graph_persisted else "edge_upsert_failed"
+            try:
+                self._mongo.log_event(
+                    event_type,
+                    subject_id=None,
+                    details={
+                        "from_space": from_space,
+                        "from_id": from_id,
+                        "relation": relation,
+                        "to_space": to_space,
+                        "to_id": to_id,
+                        "graph_status": graph_status,
+                    },
+                )
+                output["stores"]["documents"] = (
+                    "audited" if graph_persisted else "failure_audited"
+                )
+            except Exception as exc:
+                logger.warning("Document store edge audit failed: %s", exc)
+                output["stores"]["documents"] = f"error: {exc}"
         else:
             output["stores"]["documents"] = "unavailable"
 
-        logger.info("Edge added: %s/%s -[%s]-> %s/%s", from_space, from_id, relation, to_space, to_id)
+        if graph_persisted:
+            logger.info(
+                "Edge added: %s/%s -[%s]-> %s/%s",
+                from_space,
+                from_id,
+                relation,
+                to_space,
+                to_id,
+            )
+        else:
+            logger.info(
+                "Edge not persisted: %s/%s -[%s]-> %s/%s (%s)",
+                from_space,
+                from_id,
+                relation,
+                to_space,
+                to_id,
+                graph_status,
+            )
         return output
 
     def _assert_node_id_is_globally_unique(

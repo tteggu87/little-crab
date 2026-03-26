@@ -293,6 +293,22 @@ class TestLocalFactory:
         assert first is second
         assert first.available is True
 
+    def test_factory_reuses_embedded_vector_store(self, tmp_path):
+        from opencrab.config import Settings
+        from opencrab.stores.factory import make_vector_store
+
+        settings = Settings(
+            STORAGE_MODE="local",
+            LOCAL_DATA_DIR=str(tmp_path),
+            CHROMA_COLLECTION="factory_vector_cache",
+        )
+
+        first = make_vector_store(settings)
+        second = make_vector_store(settings)
+
+        assert first is second
+        assert first.location == str(tmp_path / "chroma")
+
 
 class TestLocalRuntime:
     def test_builder_persists_docs_registry_and_audit(self, tmp_path):

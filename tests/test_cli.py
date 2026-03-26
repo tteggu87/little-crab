@@ -36,3 +36,16 @@ def test_cli_entrypoint_aliases_are_declared() -> None:
     assert scripts["littlecrab"] == "opencrab.cli:main"
     assert scripts["little-crab"] == "opencrab.cli:main"
     assert scripts["opencrab"] == "opencrab.cli:main"
+
+
+def test_init_guidance_prefers_littlecrab_command() -> None:
+    from opencrab.cli import main
+
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        result = runner.invoke(main, ["init"])
+
+    assert result.exit_code == 0
+    assert "littlecrab status" in result.output
+    assert "littlecrab serve" in result.output
+    assert "opencrab status" not in result.output

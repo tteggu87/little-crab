@@ -51,3 +51,8 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return the singleton Settings instance (cached after first call)."""
     return Settings()
+
+
+def reset_settings_cache() -> None:
+    """Clear the cached Settings singleton for tests and host reloads."""
+    get_settings.cache_clear()

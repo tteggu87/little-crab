@@ -75,11 +75,12 @@ def init(force: bool) -> None:
             "[bold]Next steps:[/bold]\n\n"
             "1. Edit [cyan].env[/cyan] if you want a custom data path.\n"
             "2. Verify the embedded runtime:\n"
-            "   [cyan]opencrab status[/cyan]\n"
+            "   [cyan]littlecrab status[/cyan]\n"
             "3. Seed the embedded stores:\n"
             "   [cyan]python scripts/seed_ontology.py[/cyan]\n"
             "4. Add to Claude Code MCP config:\n"
-            "   [cyan]claude mcp add little-crab -- opencrab serve[/cyan]",
+            "   [cyan]claude mcp add little-crab -- littlecrab serve[/cyan]\n\n"
+            "[dim]Compatibility aliases remain available: little-crab, opencrab[/dim]",
             title="little-crab Setup",
             border_style="green",
         )
@@ -149,7 +150,7 @@ def status() -> None:
         ("Operational Store (DuckDB)", cfg.local_data_dir + "/opencrab.db", sql),
     ]
 
-    table = Table(title="OpenCrab Store Status", show_header=True, header_style="bold cyan")
+    table = Table(title="little-crab Store Status", show_header=True, header_style="bold cyan")
     table.add_column("Store", style="bold")
     table.add_column("Path / URL")
     table.add_column("Status")
@@ -240,8 +241,17 @@ def ingest(path: str, recursive: bool, extension: str) -> None:
 @click.argument("question")
 @click.option("--spaces", "-s", default=None, help="Comma-separated space IDs to filter.")
 @click.option("--limit", "-n", default=10, show_default=True)
+@click.option("--project", default=None, help="Optional project metadata filter.")
+@click.option("--source-id-prefix", default=None, help="Optional source_id prefix filter.")
 @click.option("--json-output", is_flag=True, default=False, help="Output raw JSON.")
-def query(question: str, spaces: str | None, limit: int, json_output: bool) -> None:
+def query(
+    question: str,
+    spaces: str | None,
+    limit: int,
+    project: str | None,
+    source_id_prefix: str | None,
+    json_output: bool,
+) -> None:
     """Run a hybrid query and print results."""
     from opencrab.config import get_settings
     from opencrab.ontology.query import HybridQuery
@@ -254,7 +264,13 @@ def query(question: str, spaces: str | None, limit: int, json_output: bool) -> N
 
     space_filter = [s.strip() for s in spaces.split(",")] if spaces else None
 
-    results = hybrid.query(question=question, spaces=space_filter, limit=limit)
+    results = hybrid.query(
+        question=question,
+        spaces=space_filter,
+        limit=limit,
+        project=project,
+        source_id_prefix=source_id_prefix,
+    )
 
     if json_output:
         click.echo(json.dumps([r.to_dict() for r in results], indent=2, default=str))
@@ -265,6 +281,10 @@ def query(question: str, spaces: str | None, limit: int, json_output: bool) -> N
         return
 
     console.print(f"\n[bold]Query:[/bold] {question}")
+    if project:
+        console.print(f"[dim]Project filter: {project}[/dim]")
+    if source_id_prefix:
+        console.print(f"[dim]Source prefix filter: {source_id_prefix}[/dim]")
     console.print(f"[dim]Found {len(results)} result(s)[/dim]\n")
 
     for i, result in enumerate(results, 1):
