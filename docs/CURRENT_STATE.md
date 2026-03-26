@@ -1,7 +1,7 @@
 ---
 status: Active
 source_of_truth: Yes
-last_updated: 2026-03-26
+last_updated: 2026-03-27
 superseded_by: N/A
 ---
 
@@ -37,6 +37,7 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 - Grammar manifest: [opencrab/grammar/manifest.py](/C:/python_Github/playground/little-crab/opencrab/grammar/manifest.py)
 - Grammar validation: [opencrab/grammar/validator.py](/C:/python_Github/playground/little-crab/opencrab/grammar/validator.py)
 - Builder: [opencrab/ontology/builder.py](/C:/python_Github/playground/little-crab/opencrab/ontology/builder.py)
+- Agent context pipeline: [opencrab/ontology/context_pipeline.py](/C:/python_Github/playground/little-crab/opencrab/ontology/context_pipeline.py)
 - Query: [opencrab/ontology/query.py](/C:/python_Github/playground/little-crab/opencrab/ontology/query.py)
 - ReBAC: [opencrab/ontology/rebac.py](/C:/python_Github/playground/little-crab/opencrab/ontology/rebac.py)
 - Impact: [opencrab/ontology/impact.py](/C:/python_Github/playground/little-crab/opencrab/ontology/impact.py)
@@ -47,6 +48,9 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 - There is no live Docker mode.
 - There is no live Neo4j/MongoDB/PostgreSQL path.
 - The module namespace remains `opencrab` intentionally for compatibility.
+- Canonical ontology entity and relation truth lives in Ladybug.
+- Canonical documentary, provenance, registry, policy, audit, and impact truth lives in DuckDB.
+- Chroma remains a derived retrieval index, not a canonical truth store.
 
 ## Why This Fork Exists
 
@@ -62,12 +66,26 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 - Partial knowledge is acceptable: the runtime can start with evidence or concepts first, then grow by adding missing relations later.
 - The system supports guided autonomy: agents have freedom to extend the graph, but not freedom to ignore the ontology.
 
+## Explicit Preservation Targets
+
+little-crab now treats the following OpenCrab flexibility traits as explicit preservation goals:
+
+- `partial knowledge visibility`: incomplete graph state should remain visible enough for later gap-filling instead of being flattened away by read models
+- `non-English query viability`: retrieval and investigation paths should not assume ASCII-only questions
+- `provenance depth`: evidence-to-claim-to-concept-to-outcome reasoning should remain explainable across multiple hops when the data supports it
+
 ## Current Truth
 
 - `littlecrab` is the canonical user-facing CLI command.
 - `little-crab` and `opencrab` both resolve to the same CLI implementation as compatibility aliases.
 - The live runtime is the embedded local stack only.
 - Grammar and MCP tool naming remain aligned with upstream OpenCrab semantics.
+- The MCP stdio server now accepts negotiated protocol versions, `notifications/initialized`, `resources/list`, `resources/templates/list`, and batched JSON-RPC requests.
+- Successful edge registry rows and `edge_upsert` audit events are emitted only after the graph edge itself persists; failed graph edge writes are tracked as failed attempts instead of live edges.
+- `project` and `source_id_prefix` query filters intentionally keep retrieval inside caller scope by restricting vector results and disabling graph expansion.
+- Embedded runtime state can be rebuilt in-process for tests or host reloads with `opencrab.mcp.tools.reset_runtime_state()`.
+- `ontology_query` now assembles a derived `context` bundle through the read-only agent context pipeline while keeping legacy `results` for compatibility.
+- The agent context bundle is not a second SSOT; it is derived from the live local stores for agent-facing reasoning only.
 - User-facing runtime payloads now describe local roles such as `graph`, `documents`, `registry`, and `vectors` instead of removed backend brands.
 
 ## Compatibility Boundary
@@ -93,12 +111,15 @@ Current payload label migration:
 
 ## Verification Snapshot
 
-Last checked on 2026-03-26 with `py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py`:
+Last checked on 2026-03-27 with `py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py`:
 
 - `py -3.12 scripts/verify_repo_intelligence.py` passed
 - `tests/test_stores.py` passed
 - `tests/test_mcp.py` passed
 - `tests/test_cli.py` passed
+- `py -3.12 scripts/dogfood_mcp.py --transcript-dir .codex/ralph/archive/agent-context-dogfood` passed
+- manual off-repo MCP stdio probe for `initialize -> initialized -> tools/list -> resources/list -> resources/templates/list` passed
+- manual off-repo MCP stdio probe with batched follow-up requests passed
 - fresh `LOCAL_DATA_DIR` smoke for `status -> seed -> query` passed
 - canonical MCP session evidence can now be regenerated with `py -3.12 scripts/dogfood_mcp.py --transcript-dir ...`
 - canonical MCP session evidence was generated into `docs/evidence/agent_sessions/2026-03-26-canonical`

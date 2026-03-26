@@ -1,7 +1,7 @@
 metadata:
   status: Active
   source_of_truth: true
-  last_updated: 2026-03-26
+  last_updated: 2026-03-27
   purpose: "Canonical terminology used by docs, manifests, and runtime guidance."
 
 terms:
@@ -46,6 +46,75 @@ terms:
       - little-crab
       - metaontology_os
       - mcp_surface
+    replaced_by: null
+  - term: opencrab_flexibility
+    aliases:
+      - preserved flexibility
+      - investigation flexibility
+    status: active
+    definition: "The OpenCrab-derived expectation that the runtime should keep partial knowledge usable, support non-English query paths, and preserve enough provenance depth to explain multi-step graph reasoning."
+    owned_by: repository
+    related_terms:
+      - agentic_growth_loop
+      - metaontology_os
+      - partial_knowledge_visibility
+      - non_english_query_viability
+      - provenance_depth
+    replaced_by: null
+  - term: partial_knowledge_visibility
+    aliases:
+      - incomplete graph visibility
+    status: active
+    definition: "The requirement that incomplete ontology state remains visible enough for later gap-filling instead of being hidden by read models."
+    owned_by: runtime
+    related_terms:
+      - agentic_growth_loop
+      - opencrab_flexibility
+    replaced_by: null
+  - term: non_english_query_viability
+    aliases:
+      - unicode query support
+      - multilingual query viability
+    status: active
+    definition: "The requirement that retrieval and investigation flows remain usable for non-English and non-ASCII questions."
+    owned_by: runtime
+    related_terms:
+      - opencrab_flexibility
+      - mcp_surface
+    replaced_by: null
+  - term: provenance_depth
+    aliases:
+      - multi-hop provenance
+    status: active
+    definition: "The requirement that provenance views remain deep enough to explain multi-step evidence-to-claim-to-concept-to-outcome connections when the graph supports them."
+    owned_by: runtime
+    related_terms:
+      - opencrab_flexibility
+      - agentic_growth_loop
+    replaced_by: null
+  - term: agent_context_pipeline
+    aliases:
+      - context pipeline
+      - agent context ingress
+    status: active
+    definition: "The read-only pipeline that assembles one agent-consumable context bundle from the live local stores without becoming a second canonical truth system."
+    owned_by: runtime
+    related_terms:
+      - local_first_runtime
+      - mcp_surface
+      - agentic_growth_loop
+    replaced_by: null
+  - term: derived_agent_context
+    aliases:
+      - context bundle
+      - agent-facing context bundle
+    status: active
+    definition: "The derived bundle of facts, evidence, provenance, gaps, policy hints, scope, uncertainty, and raw references returned for agent-facing reasoning."
+    owned_by: runtime
+    related_terms:
+      - agent_context_pipeline
+      - provenance_depth
+      - partial_knowledge_visibility
     replaced_by: null
   - term: compatibility_namespace
     aliases:

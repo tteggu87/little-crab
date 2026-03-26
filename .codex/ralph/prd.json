@@ -1,0 +1,82 @@
+{
+  "project": "little-crab agent context pipeline",
+  "branch": "codex/agent-context-pipeline",
+  "branchName": "codex/agent-context-pipeline",
+  "description": "Introduce a single internal reasoning ingress for agent-facing context assembly while preserving current distributed canonical store ownership.",
+  "stories": [
+    {
+      "id": "ACP-1",
+      "title": "Define the read-only agent context contract",
+      "description": "Add a thin AgentContextPipeline and request/bundle contract under the ontology layer without changing persistence ownership or MCP tool names.",
+      "acceptanceCriteria": [
+        "A single internal method exists for agent-facing context assembly.",
+        "The contract is read-only and introduces no new persistence.",
+        "The bundle shape includes facts, evidence, provenance_paths, inferred_links, missing_links, policies, scope, uncertainty, and raw_refs."
+      ],
+      "priority": "high",
+      "passes": true,
+      "checks": [
+        "py -3.12 -m pytest tests/test_mcp.py tests/test_stores.py"
+      ],
+      "notes": [
+        "Keep the module in the existing ontology/runtime neighborhood.",
+        "Do not rename MCP tools."
+      ]
+    },
+    {
+      "id": "ACP-2",
+      "title": "Route ontology_query through the pipeline",
+      "description": "Refactor query assembly so agent-facing reads consume the pipeline contract while preserving current top-level compatibility.",
+      "acceptanceCriteria": [
+        "ontology_query uses the pipeline-backed context assembly path.",
+        "Current response shape remains backward-tolerant.",
+        "Scope filters remain enforced."
+      ],
+      "priority": "high",
+      "passes": true,
+      "checks": [
+        "py -3.12 -m pytest tests/test_mcp.py tests/test_cli.py"
+      ],
+      "notes": [
+        "Preserve graph expansion suppression when scope filters are active."
+      ]
+    },
+    {
+      "id": "ACP-3",
+      "title": "Enrich context with provenance, gaps, and policy hints",
+      "description": "Assemble richer agent-facing context from Ladybug, DuckDB, and Chroma without turning the pipeline into a second truth system.",
+      "acceptanceCriteria": [
+        "The bundle distinguishes confirmed facts, inferred links, and missing links.",
+        "Supporting evidence and provenance paths are present when available.",
+        "Policy hints are included where relevant to reasoning."
+      ],
+      "priority": "medium",
+      "passes": true,
+      "checks": [
+        "py -3.12 -m pytest tests/test_mcp.py tests/test_stores.py"
+      ],
+      "notes": [
+        "Do not persist assembled context as canonical state."
+      ]
+    },
+    {
+      "id": "ACP-4",
+      "title": "Sync docs, intelligence, and dogfood verification",
+      "description": "Update canonical docs and repository intelligence so the new cognition-vs-truth boundary is explicit and verified.",
+      "acceptanceCriteria": [
+        "CURRENT_STATE and ARCHITECTURE describe canonical store ownership and derived agent context correctly.",
+        "Relevant intelligence files are updated.",
+        "Dogfood and regression checks cover context shape and scope behavior."
+      ],
+      "priority": "medium",
+      "passes": true,
+      "checks": [
+        "py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py",
+        "py -3.12 scripts/verify_repo_intelligence.py"
+      ],
+      "notes": [
+        "Keep documentation drift at zero within the same task."
+      ]
+    }
+  ]
+}
