@@ -1,5 +1,7 @@
 # little-crab
 
+[한국어 README](C:/python_Github/playground/little-crab/README.ko.md)
+
 little-crab is a local-first fork of OpenCrab built to keep the original ontology grammar and agentic workflow while removing the heavy server database stack.
 
 This project exists to make the OpenCrab idea run well on a single machine. Instead of requiring Neo4j, MongoDB, and PostgreSQL services, little-crab keeps the grammar, validator, MCP tool surface, and agentic ontology loop, but runs them on embedded local stores.
