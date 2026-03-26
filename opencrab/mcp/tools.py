@@ -190,6 +190,8 @@ def ontology_query(
     limit: int = 10,
     project: str | None = None,
     source_id_prefix: str | None = None,
+    subject_id: str | None = None,
+    permission: str | None = None,
 ) -> dict[str, Any]:
     """
     Run a hybrid vector + graph query against the ontology.
@@ -206,6 +208,10 @@ def ontology_query(
         Optional project metadata filter used to scope vector results.
     source_id_prefix:
         Optional source_id prefix used to scope vector results.
+    subject_id:
+        Optional subject ID used to add policy hints for relevant resource facts.
+    permission:
+        Optional permission label used with subject_id for policy hints.
     """
     ctx = _get_context()
     try:
@@ -218,6 +224,8 @@ def ontology_query(
                 limit=limit,
                 project=project,
                 source_id_prefix=source_id_prefix,
+                subject_id=subject_id,
+                permission=permission,
             )
         )
         results = bundle.legacy_results()
@@ -226,6 +234,8 @@ def ontology_query(
             "spaces_filter": spaces,
             "project_filter": project,
             "source_id_prefix_filter": source_id_prefix,
+            "subject_id": subject_id,
+            "permission": permission,
             "graph_expansion": bundle.scope["graph_expansion_enabled"],
             "total": len(results),
             "results": results,
@@ -536,6 +546,14 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "source_id_prefix": {
                     "type": "string",
                     "description": "Optional source_id prefix filter.",
+                },
+                "subject_id": {
+                    "type": "string",
+                    "description": "Optional subject ID used to add policy hints for relevant resources.",
+                },
+                "permission": {
+                    "type": "string",
+                    "description": "Optional permission used with subject_id for policy hints.",
                 },
             },
             "required": ["question"],

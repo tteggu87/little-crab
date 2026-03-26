@@ -51,7 +51,7 @@
         "Policy hints are included where relevant to reasoning."
       ],
       "priority": "medium",
-      "passes": false,
+      "passes": true,
       "checks": [
         "py -3.12 -m pytest tests/test_mcp.py tests/test_stores.py"
       ],

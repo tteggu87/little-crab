@@ -174,7 +174,12 @@ class AgentContextPipeline:
         supporting_evidence = self._collect_supporting_evidence(facts)
         provenance_paths = self._collect_provenance_paths(facts)
         inferred_links = self._collect_inferred_links(facts)
-        missing_links = self._collect_missing_links(request, facts)
+        missing_links = self._collect_missing_links(
+            request,
+            facts,
+            supporting_evidence,
+            provenance_paths,
+        )
         policies = self._collect_policy_hints(request, facts)
         raw_refs = self._collect_raw_refs(facts)
 
@@ -219,6 +224,7 @@ class AgentContextPipeline:
             text=result.text,
             metadata=dict(result.metadata or {}),
             graph_context=dict(result.graph_context or {}) or None,
+            status="inferred" if result.source == "graph" else "confirmed",
         )
 
     def _collect_supporting_evidence(
@@ -229,21 +235,52 @@ class AgentContextPipeline:
         for fact in facts:
             source_id = str(fact.metadata.get("source_id") or "")
             if source_id:
+                stored_source = None
+                if self._documents is not None and self._documents.available:
+                    stored_source = self._documents.get_source(source_id)
                 evidence.append(
                     SupportingEvidence(
                         ref=source_id,
                         ref_type="source_document",
-                        text_excerpt=fact.text,
-                        metadata={"node_id": fact.node_id, "source": fact.source},
+                        text_excerpt=(
+                            _trim_excerpt(str(stored_source.get("text") or ""))
+                            if stored_source
+                            else fact.text
+                        ),
+                        metadata={
+                            "node_id": fact.node_id,
+                            "source": fact.source,
+                            "source_metadata": (
+                                dict(stored_source.get("metadata") or {})
+                                if stored_source
+                                else {}
+                            ),
+                        },
                     )
                 )
             elif fact.node_id:
+                node_doc = None
+                space = str(fact.metadata.get("space") or "")
+                if (
+                    space
+                    and self._documents is not None
+                    and self._documents.available
+                ):
+                    node_doc = self._documents.get_node_doc(space, fact.node_id)
                 evidence.append(
                     SupportingEvidence(
                         ref=fact.node_id,
                         ref_type="ontology_node",
-                        text_excerpt=fact.text,
-                        metadata={"source": fact.source},
+                        text_excerpt=_node_excerpt(node_doc) or fact.text,
+                        metadata={
+                            "source": fact.source,
+                            "space": space or None,
+                            "properties": (
+                                dict(node_doc.get("properties") or {})
+                                if node_doc
+                                else {}
+                            ),
+                        },
                     )
                 )
         return evidence
@@ -262,6 +299,15 @@ class AgentContextPipeline:
                             "labels": list(fact.graph_context.get("labels", [])),
                             "source": fact.source,
                         },
+                    )
+                )
+            source_id = str(fact.metadata.get("source_id") or "")
+            if source_id and fact.node_id:
+                paths.append(
+                    ProvenancePath(
+                        nodes=[source_id, str(fact.node_id)],
+                        relation="source_supports_fact",
+                        metadata={"source": fact.source},
                     )
                 )
         return paths
@@ -286,6 +332,8 @@ class AgentContextPipeline:
         self,
         request: AgentContextRequest,
         facts: list[AgentFact],
+        supporting_evidence: list[SupportingEvidence],
+        provenance_paths: list[ProvenancePath],
     ) -> list[MissingLink]:
         missing: list[MissingLink] = []
         if not facts:
@@ -311,6 +359,33 @@ class AgentContextPipeline:
                     },
                 )
             )
+        evidence_refs = {item.ref for item in supporting_evidence}
+        provenance_targets = {path.nodes[-1] for path in provenance_paths if path.nodes}
+        for fact in facts:
+            if fact.node_id and fact.node_id not in evidence_refs and not fact.metadata.get("source_id"):
+                missing.append(
+                    MissingLink(
+                        kind="missing_supporting_evidence",
+                        description=(
+                            f"Fact {fact.node_id} has no linked source document evidence in the "
+                            "current context bundle."
+                        ),
+                        suggested_next_step="Attach supporting source material or ingest a related document.",
+                        metadata={"node_id": fact.node_id},
+                    )
+                )
+            if fact.node_id and fact.node_id not in provenance_targets and fact.source != "vector":
+                missing.append(
+                    MissingLink(
+                        kind="missing_provenance_path",
+                        description=(
+                            f"Fact {fact.node_id} is visible but has no explicit provenance path "
+                            "in the current context bundle."
+                        ),
+                        suggested_next_step="Investigate neighboring evidence or add missing relation edges.",
+                        metadata={"node_id": fact.node_id},
+                    )
+                )
         return missing
 
     def _collect_policy_hints(
@@ -323,6 +398,8 @@ class AgentContextPipeline:
 
         hints: list[PolicyHint] = []
         for fact in facts:
+            if fact.metadata.get("space") not in (None, "resource", ""):
+                continue
             resource_id = fact.node_id or str(fact.metadata.get("resource_id") or "")
             if not resource_id:
                 continue
@@ -360,3 +437,20 @@ class AgentContextPipeline:
                     refs.append(RawRef(ref=source_id, ref_type="source_document"))
                     seen.add(key)
         return refs
+
+
+def _trim_excerpt(text: str, limit: int = 280) -> str:
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."
+
+
+def _node_excerpt(node_doc: dict[str, Any] | None) -> str | None:
+    if not node_doc:
+        return None
+    properties = dict(node_doc.get("properties") or {})
+    for key in ("text", "description", "name"):
+        value = properties.get(key)
+        if value:
+            return _trim_excerpt(str(value))
+    return None

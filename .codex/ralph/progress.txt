@@ -44,3 +44,11 @@ Status: planned, not started
 - Quality checks run and result: `py -3.12 -m pytest tests/test_mcp.py tests/test_cli.py` passed (54 tests).
 - Learnings for future iterations: compatibility is easiest to preserve when the pipeline owns new structure and legacy fields are derived from bundle facts.
 ---
+
+## 2026-03-27 15:25 - ACP-3
+- Enriched the agent context bundle with confirmed vs inferred facts, DuckDB-backed source evidence, provenance paths, explicit missing-link reporting, and optional policy hints.
+- Added optional `subject_id` and `permission` support to `ontology_query` so policy hints can be surfaced when the caller provides access context.
+- Files changed: `.codex/ralph/prd.json`, `opencrab/ontology/context_pipeline.py`, `opencrab/mcp/tools.py`, `tests/test_mcp.py`
+- Quality checks run and result: `py -3.12 -m pytest tests/test_mcp.py tests/test_stores.py` passed (78 tests).
+- Learnings for future iterations: provenance and gap reporting stay understandable when the bundle distinguishes store-backed evidence from graph-only inference instead of flattening everything into one result list.
+---

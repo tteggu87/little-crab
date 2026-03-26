@@ -344,9 +344,14 @@ class TestToolDispatch:
         payload = bundle.to_dict()
 
         assert len(bundle.facts) == 2
+        assert payload["facts"][0]["status"] == "confirmed"
+        assert payload["facts"][1]["status"] == "inferred"
         assert payload["scope"]["graph_expansion_enabled"] is True
         assert payload["supporting_evidence"][0]["ref"] == "src-1"
-        assert payload["provenance_paths"][0]["nodes"] == ["n1", "n2"]
+        assert any(
+            path["nodes"] == ["n1", "n2"] and path["relation"] == "graph_neighbor"
+            for path in payload["provenance_paths"]
+        )
         assert payload["inferred_links"][0]["relation"] == "neighbor_of"
         assert payload["raw_refs"][0]["ref_type"] == "node"
 
@@ -370,6 +375,49 @@ class TestToolDispatch:
         assert payload["missing_links"][0]["kind"] == "no_match"
         assert payload["missing_links"][1]["kind"] == "scope_constrained_graph_expansion"
         assert payload["uncertainty"]["scope_filters_active"] is True
+
+    def test_agent_context_pipeline_enriches_evidence_and_policy_hints(self):
+        from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
+        from opencrab.ontology.query import QueryResult
+
+        hybrid = MagicMock()
+        hybrid.query.return_value = [
+            QueryResult(
+                source="vector",
+                node_id="doc-1",
+                score=0.92,
+                text="Short summary",
+                metadata={"source_id": "src-1", "space": "resource"},
+            )
+        ]
+        documents = MagicMock()
+        documents.available = True
+        documents.get_source.return_value = {
+            "text": "This is the longer supporting source text for doc-1.",
+            "metadata": {"project": "alpha"},
+        }
+        documents.get_node_doc.return_value = {
+            "properties": {"description": "Document node description"},
+        }
+        operational = MagicMock()
+        operational.check_policy.return_value = True
+
+        pipeline = AgentContextPipeline(hybrid, documents, operational)
+        bundle = pipeline.build_context(
+            AgentContextRequest(
+                question="what can alice view",
+                subject_id="alice",
+                permission="view",
+            )
+        )
+        payload = bundle.to_dict()
+
+        assert payload["supporting_evidence"][0]["text_excerpt"].startswith(
+            "This is the longer supporting source text"
+        )
+        assert payload["policies"][0]["subject_id"] == "alice"
+        assert payload["policies"][0]["status"] == "granted"
+        assert payload["provenance_paths"][0]["relation"] == "source_supports_fact"
 
 
 # ---------------------------------------------------------------------------
