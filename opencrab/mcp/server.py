@@ -49,6 +49,12 @@ class MCPServer:
         cfg = get_settings()
         self._name = cfg.mcp_server_name
         self._version = cfg.mcp_server_version
+        self._supported_protocol_versions = (
+            "2025-11-25",
+            "2025-03-26",
+            "2024-11-05",
+        )
+        self._initialized = False
 
     # ------------------------------------------------------------------
     # Entry point
@@ -83,10 +89,11 @@ class MCPServer:
             return None
 
         try:
-            request = json.loads(raw)
+            request = json.loads(raw.lstrip("\ufeff"))
         except json.JSONDecodeError as exc:
             return self._error_response(None, PARSE_ERROR, f"Parse error: {exc}")
 
+        has_id = "id" in request
         req_id = request.get("id")
         method = request.get("method")
 
@@ -94,6 +101,13 @@ class MCPServer:
             return self._error_response(req_id, INVALID_REQUEST, "Missing or invalid 'method'.")
 
         params = request.get("params") or {}
+
+        if not has_id and method.startswith("notifications/"):
+            try:
+                self._dispatch(method, params)
+            except Exception as exc:
+                logger.warning("Ignoring notification '%s' after error: %s", method, exc)
+            return None
 
         try:
             result = self._dispatch(method, params)
@@ -111,6 +125,9 @@ class MCPServer:
         """Route a method to its handler."""
         if method == "initialize":
             return self._handle_initialize(params)
+        elif method == "notifications/initialized":
+            self._initialized = True
+            return None
         elif method == "tools/list":
             return self._handle_tools_list(params)
         elif method == "tools/call":
@@ -130,8 +147,14 @@ class MCPServer:
 
         Returns server capabilities and protocol version.
         """
+        requested_version = params.get("protocolVersion")
+        protocol_version = (
+            requested_version
+            if requested_version in self._supported_protocol_versions
+            else self._supported_protocol_versions[0]
+        )
         return {
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": protocol_version,
             "capabilities": {
                 "tools": {"listChanged": False},
             },
