@@ -43,6 +43,8 @@ little-crab는 OpenCrab의 문법, validator, MCP tool surface, agentic ontology
 
 ## 빠른 시작
 
+아래 예시는 `python`이 Python 3.11 이상을 가리킨다고 가정합니다.
+
 ### 1. 설치
 
 ```bash
@@ -111,7 +113,7 @@ codex mcp list
 
 새 MCP 서버를 현재 에이전트 세션에서 보려면 Codex 새 세션을 여는 편이 안전합니다.
 
-만약 `littlecrab` 명령이 `PATH`에 없다면, 가상환경을 활성화하거나 아래 호환 fallback을 쓸 수 있습니다.
+만약 `littlecrab` 명령이 `PATH`에 없다면 먼저 가상환경을 활성화하세요. Windows에서 `python`이 아직 3.10을 가리키는 경우에는 아래 launcher fallback을 쓰면 됩니다.
 
 ```bash
 py -3.12 -m opencrab.cli serve

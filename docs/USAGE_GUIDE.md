@@ -11,6 +11,8 @@ This guide explains how to set up little-crab as an MCP server, where to place s
 
 ## 1. Install And Initialize
 
+These examples assume `python` resolves to Python 3.11 or newer.
+
 ```bash
 python -m pip install -e ".[dev]"
 littlecrab init
@@ -43,7 +45,7 @@ codex mcp list
 
 Open a new Codex session after registration so the MCP server is available to the agent.
 
-If the canonical `littlecrab` command is not on `PATH`, activate your virtualenv first or fall back to:
+If the canonical `littlecrab` command is not on `PATH`, activate your virtualenv first. On Windows systems where `python` still resolves to 3.10, fall back to:
 
 ```bash
 py -3.12 -m opencrab.cli serve

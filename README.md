@@ -45,6 +45,8 @@ The Python package name is `little-crab`. The canonical CLI command is `littlecr
 
 ## Quick Start
 
+The examples below assume `python` resolves to Python 3.11 or newer.
+
 ### 1. Install
 
 ```bash
@@ -111,7 +113,7 @@ codex mcp list
 
 Open a new Codex session after registration so the new MCP server is visible to the agent.
 
-If `littlecrab` is not on your `PATH`, activate your virtualenv first or use the compatibility fallback:
+If `littlecrab` is not on your `PATH`, activate your virtualenv first. On Windows systems where `python` still resolves to 3.10, use the launcher fallback instead:
 
 ```bash
 py -3.12 -m opencrab.cli serve
