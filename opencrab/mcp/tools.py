@@ -209,21 +209,27 @@ def ontology_query(
     """
     ctx = _get_context()
     try:
-        results = ctx["hybrid"].query(
-            question=question,
-            spaces=spaces,
-            limit=limit,
-            project=project,
-            source_id_prefix=source_id_prefix,
+        from opencrab.ontology.context_pipeline import AgentContextRequest
+
+        bundle = ctx["context_pipeline"].build_context(
+            AgentContextRequest(
+                question=question,
+                spaces=spaces,
+                limit=limit,
+                project=project,
+                source_id_prefix=source_id_prefix,
+            )
         )
+        results = bundle.legacy_results()
         return {
             "question": question,
             "spaces_filter": spaces,
             "project_filter": project,
             "source_id_prefix_filter": source_id_prefix,
-            "graph_expansion": not bool(project or source_id_prefix),
+            "graph_expansion": bundle.scope["graph_expansion_enabled"],
             "total": len(results),
-            "results": [r.to_dict() for r in results],
+            "results": results,
+            "context": bundle.to_dict(),
         }
     except Exception as exc:
         logger.error("ontology_query failed: %s", exc)

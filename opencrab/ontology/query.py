@@ -9,7 +9,7 @@ Query pipeline:
   2. Extract node IDs from the top vector hits.
   3. Use those IDs as anchors for a graph neighbourhood expansion.
   4. Merge, deduplicate, and rank results.
-  5. Return a unified result list.
+  5. Return a unified result list for the read-only agent context pipeline.
 """
 
 from __future__ import annotations
@@ -58,6 +58,8 @@ class HybridQuery:
         spaces: list[str] | None = None,
         limit: int = 10,
         graph_depth: int = 1,
+        project: str | None = None,
+        source_id_prefix: str | None = None,
     ) -> list[QueryResult]:
         """
         Execute a hybrid query against vector and graph stores.
@@ -72,6 +74,10 @@ class HybridQuery:
             Maximum number of results to return.
         graph_depth:
             Neighbourhood expansion depth from vector-hit anchors.
+        project:
+            Optional project metadata filter used to scope vector search.
+        source_id_prefix:
+            Optional source_id prefix used to scope vector search.
 
         Returns
         -------
@@ -80,14 +86,21 @@ class HybridQuery:
         results: list[QueryResult] = []
 
         # --- Stage 1: Vector similarity search ---
-        vector_hits = self._vector_search(question, spaces, limit)
+        vector_hits = self._vector_search(
+            question=question,
+            spaces=spaces,
+            limit=limit,
+            project=project,
+            source_id_prefix=source_id_prefix,
+        )
         results.extend(vector_hits)
 
         # --- Stage 2: Graph expansion from vector anchor nodes ---
         anchor_ids = [
             hit.node_id for hit in vector_hits if hit.node_id
         ]
-        if anchor_ids and self._neo4j.available:
+        scope_filters_active = bool(project or source_id_prefix)
+        if anchor_ids and self._neo4j.available and not scope_filters_active:
             graph_results = self._graph_expand(anchor_ids, graph_depth, limit)
             # Avoid duplicating nodes already in vector results
             seen_ids = {r.node_id for r in results}
@@ -101,7 +114,12 @@ class HybridQuery:
         return results[:limit]
 
     def _vector_search(
-        self, question: str, spaces: list[str] | None, limit: int
+        self,
+        question: str,
+        spaces: list[str] | None,
+        limit: int,
+        project: str | None = None,
+        source_id_prefix: str | None = None,
     ) -> list[QueryResult]:
         """Run embedded ChromaDB semantic similarity search."""
         if not self._chroma.available:
@@ -109,16 +127,28 @@ class HybridQuery:
             return []
 
         try:
-            where: dict[str, Any] | None = None
+            clauses: list[dict[str, Any]] = []
             if spaces:
                 if len(spaces) == 1:
-                    where = {"space": spaces[0]}
+                    clauses.append({"space": spaces[0]})
                 else:
-                    where = {"space": {"$in": spaces}}
+                    clauses.append({"space": {"$in": spaces}})
+            if project:
+                clauses.append({"project": project})
+
+            where: dict[str, Any] | None = None
+            if len(clauses) == 1:
+                where = clauses[0]
+            elif clauses:
+                where = {"$and": clauses}
+
+            fetch_limit = min(limit, 20)
+            if source_id_prefix:
+                fetch_limit = min(max(limit * 5, 20), 100)
 
             hits = self._chroma.query(
                 query_text=question,
-                n_results=min(limit, 20),
+                n_results=fetch_limit,
                 where=where,
             )
 
@@ -128,6 +158,10 @@ class HybridQuery:
                 distance = hit.get("distance") or 0.0
                 score = max(0.0, 1.0 - float(distance))
                 meta = hit.get("metadata") or {}
+                if source_id_prefix:
+                    source_id = str(meta.get("source_id") or "")
+                    if not source_id.startswith(source_id_prefix):
+                        continue
                 results.append(
                     QueryResult(
                         source="vector",
@@ -137,7 +171,7 @@ class HybridQuery:
                         metadata=meta,
                     )
                 )
-            return results
+            return results[:limit]
         except Exception as exc:
             logger.warning("Vector search error: %s", exc)
             return []
@@ -205,7 +239,7 @@ class HybridQuery:
         -------
         dict with ingestion status.
         """
-        meta = metadata or {}
+        meta = dict(metadata or {})
         meta["source_id"] = source_id
 
         result: dict[str, Any] = {"source_id": source_id, "stores": {}}

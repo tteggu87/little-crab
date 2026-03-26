@@ -138,20 +138,40 @@ class TestToolDispatch:
 
     def test_ontology_query_returns_results(self):
         from opencrab.mcp.tools import dispatch_tool
-        from opencrab.ontology.query import QueryResult
+        from opencrab.ontology.context_pipeline import AgentContextBundle, AgentFact
 
         with patch("opencrab.mcp.tools._get_context") as mock_ctx:
-            mock_result = QueryResult(
-                source="vector", node_id="n1", score=0.9, text="Test text", metadata={}
+            bundle = AgentContextBundle(
+                facts=[
+                    AgentFact(
+                        source="vector",
+                        node_id="n1",
+                        score=0.9,
+                        text="Test text",
+                        metadata={},
+                    )
+                ],
+                supporting_evidence=[],
+                provenance_paths=[],
+                inferred_links=[],
+                missing_links=[],
+                policies=[],
+                scope={"graph_expansion_enabled": True},
+                uncertainty={"fact_count": 1},
+                raw_refs=[],
             )
-            hybrid = MagicMock()
-            hybrid.query.return_value = [mock_result]
+            context_pipeline = MagicMock()
+            context_pipeline.build_context.return_value = bundle
             mock_ctx.return_value = {
                 "builder": MagicMock(), "rebac": MagicMock(),
-                "impact": MagicMock(), "hybrid": hybrid, "documents": MagicMock(),
+                "impact": MagicMock(),
+                "hybrid": MagicMock(),
+                "documents": MagicMock(),
+                "context_pipeline": context_pipeline,
             }
             result = dispatch_tool("ontology_query", {"question": "What is a lever?"})
             assert "results" in result
+            assert "context" in result
             assert result["total"] == 1
             assert result["results"][0]["node_id"] == "n1"
 

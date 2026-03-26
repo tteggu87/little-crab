@@ -33,7 +33,7 @@
         "Scope filters remain enforced."
       ],
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "checks": [
         "py -3.12 -m pytest tests/test_mcp.py tests/test_cli.py"
       ],
