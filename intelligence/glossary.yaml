@@ -1,0 +1,68 @@
+metadata:
+  status: Active
+  source_of_truth: true
+  last_updated: 2026-03-26
+  purpose: "Canonical terminology used by docs, manifests, and runtime guidance."
+
+terms:
+  - term: little-crab
+    aliases:
+      - opencrab fork
+    status: active
+    definition: "Local-first fork of OpenCrab preserving grammar, validator behavior, MCP tool surface, and the agentic ontology growth loop while removing server-backed database requirements."
+    owned_by: repository
+    related_terms:
+      - metaontology_os
+      - local_first_runtime
+      - agentic_growth_loop
+    replaced_by: null
+  - term: metaontology_os
+    aliases:
+      - metaontology
+    status: active
+    definition: "The 9-space ontology grammar that governs node and edge legality and gives agents a stable coordinate system for partial knowledge."
+    owned_by: grammar
+    related_terms:
+      - mcp_surface
+      - agentic_growth_loop
+    replaced_by: null
+  - term: local_first_runtime
+    aliases:
+      - embedded runtime
+    status: active
+    definition: "The embedded runtime using LadybugDB, DuckDB, and embedded ChromaDB."
+    owned_by: runtime
+    related_terms:
+      - little-crab
+    replaced_by: null
+  - term: agentic_growth_loop
+    aliases:
+      - guided autonomy
+      - partial knowledge growth
+    status: active
+    definition: "The OpenCrab-derived workflow where agents can add evidence, concepts, claims, and relations incrementally, allowing the ontology to grow by filling missing structure over time."
+    owned_by: runtime
+    related_terms:
+      - little-crab
+      - metaontology_os
+      - mcp_surface
+    replaced_by: null
+  - term: compatibility_namespace
+    aliases:
+      - opencrab namespace
+    status: active
+    definition: "The retained opencrab Python module namespace used for compatibility."
+    owned_by: repository
+    related_terms:
+      - little-crab
+    replaced_by: null
+  - term: mcp_surface
+    aliases:
+      - ontology tools
+    status: active
+    definition: "The stdio JSON-RPC tool interface exposed to agents."
+    owned_by: mcp
+    related_terms:
+      - metaontology_os
+      - agentic_growth_loop
+    replaced_by: null

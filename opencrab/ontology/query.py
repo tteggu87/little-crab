@@ -211,7 +211,7 @@ class HybridQuery:
         result: dict[str, Any] = {"source_id": source_id, "stores": {}}
 
         if not self._chroma.available:
-            result["stores"]["chromadb"] = "unavailable"
+            result["stores"]["vectors"] = "unavailable"
             return result
 
         try:
@@ -220,11 +220,11 @@ class HybridQuery:
                 metadatas=[meta],
                 ids=[source_id],
             )
-            result["stores"]["chromadb"] = f"ok (id={ids[0]})"
+            result["stores"]["vectors"] = f"ok (id={ids[0]})"
             result["vector_id"] = ids[0]
         except Exception as exc:
             logger.warning("Ingest to ChromaDB failed: %s", exc)
-            result["stores"]["chromadb"] = f"error: {exc}"
+            result["stores"]["vectors"] = f"error: {exc}"
 
         return result
 

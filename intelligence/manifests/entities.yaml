@@ -1,0 +1,58 @@
+metadata:
+  status: Active
+  source_of_truth: false
+  last_updated: 2026-03-26
+  purpose: "Repository-level named entities for docs and runtime alignment."
+
+entities:
+  - key: little_crab_project
+    canonical_terms:
+      - little-crab
+    used_by_actions:
+      - cli.init
+      - cli.manifest
+      - cli.status
+      - cli.query
+      - cli.serve
+  - key: agentic_growth_runtime
+    canonical_terms:
+      - agentic_growth_loop
+    used_by_actions:
+      - cli.ingest
+      - mcp.ontology_add_node
+      - mcp.ontology_add_edge
+      - mcp.ontology_extract
+      - mcp.ontology_ingest
+      - mcp.ontology_impact
+      - mcp.ontology_rebac_check
+      - mcp.ontology_lever_simulate
+      - cli.query
+      - cli.serve
+      - mcp.ontology_manifest
+      - mcp.ontology_query
+  - key: embedded_runtime
+    canonical_terms:
+      - local_first_runtime
+    used_by_actions:
+      - cli.status
+      - script.dogfood_mcp
+      - script.seed
+  - key: grammar_manifest
+    canonical_terms:
+      - metaontology_os
+    used_by_actions:
+      - mcp.ontology_manifest
+  - key: agent_tool_surface
+    canonical_terms:
+      - mcp_surface
+    used_by_actions:
+      - cli.serve
+      - mcp.ontology_manifest
+      - mcp.ontology_add_node
+      - mcp.ontology_add_edge
+      - mcp.ontology_query
+      - mcp.ontology_rebac_check
+      - mcp.ontology_impact
+      - mcp.ontology_lever_simulate
+      - mcp.ontology_extract
+      - mcp.ontology_ingest

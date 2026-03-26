@@ -1,0 +1,235 @@
+metadata:
+  status: Active
+  source_of_truth: false
+  last_updated: 2026-03-26
+  purpose: "Current action contracts for the local-only runtime."
+
+actions:
+  - key: cli.init
+    status: implemented
+    description: "Create a local .env file from template."
+    capability: cli.init
+    implementation: "opencrab.cli:init"
+    writes_layers:
+      - Surface
+    touches_datasets: []
+    notes:
+      - "Bootstraps local configuration."
+  - key: cli.status
+    status: implemented
+    description: "Check embedded store health."
+    capability: cli.status
+    implementation: "opencrab.cli:status"
+    writes_layers:
+      - Surface
+    touches_datasets: []
+    notes:
+      - "Reads runtime state only."
+  - key: cli.ingest
+    status: implemented
+    description: "Ingest files from disk into vector and document stores."
+    capability: cli.ingest
+    implementation: "opencrab.cli:ingest"
+    writes_layers:
+      - Surface
+      - Storage
+    touches_datasets:
+      - duckdb.source_documents
+      - chroma.vectors
+    notes:
+      - "Supports both file and directory inputs."
+  - key: cli.query
+    status: implemented
+    description: "Run hybrid query via CLI."
+    capability: cli.query
+    implementation: "opencrab.cli:query"
+    writes_layers:
+      - Surface
+    touches_datasets:
+      - chroma.vectors
+    notes:
+      - "Combines vector retrieval and graph expansion."
+      - "Preserves the OpenCrab pattern of semantic lookup plus ontology expansion."
+  - key: cli.manifest
+    status: implemented
+    description: "Print the full MetaOntology grammar via CLI."
+    capability: cli.manifest
+    implementation: "opencrab.cli:manifest"
+    writes_layers:
+      - Surface
+    touches_datasets: []
+    notes:
+      - "Read-only grammar inspection surface."
+  - key: cli.serve
+    status: implemented
+    description: "Start the MCP stdio server."
+    capability: cli.serve
+    implementation: "opencrab.cli:serve"
+    writes_layers:
+      - Surface
+    touches_datasets: []
+    notes:
+      - "Primary agent-facing entrypoint."
+      - "Keeps the ontology directly operable by agents instead of reducing it to passive storage."
+  - key: script.seed
+    status: implemented
+    description: "Populate the local runtime with example ontology data."
+    capability: script.seed
+    implementation: "scripts.seed_ontology:seed"
+    writes_layers:
+      - Surface
+      - Storage
+    touches_datasets:
+      - duckdb.node_documents
+      - duckdb.source_documents
+      - duckdb.ontology_nodes
+      - duckdb.ontology_edges
+      - duckdb.rebac_policies
+      - chroma.vectors
+    notes:
+      - "Used for smoke checks and local demos."
+  - key: script.dogfood_mcp
+    status: implemented
+    description: "Run repeatable local stdio MCP dogfood scenarios."
+    capability: script.dogfood_mcp
+    implementation: "scripts.dogfood_mcp:main"
+    writes_layers:
+      - Surface
+      - Runtime
+      - Storage
+    touches_datasets:
+      - duckdb.node_documents
+      - duckdb.source_documents
+      - duckdb.audit_log
+      - duckdb.ontology_nodes
+      - duckdb.ontology_edges
+      - duckdb.rebac_policies
+      - duckdb.impact_records
+      - duckdb.lever_simulations
+      - chroma.vectors
+    notes:
+      - "Exercises the stdio MCP surface end-to-end against a local data dir."
+      - "Covers grammar inspection, graph growth, ingest/extract/query, rebac, impact, and lever simulation."
+  - key: mcp.ontology_manifest
+    status: implemented
+    description: "Return the grammar manifest over MCP."
+    capability: mcp.ontology_manifest
+    implementation: "opencrab.mcp.tools:ontology_manifest"
+    writes_layers:
+      - Surface
+    touches_datasets: []
+    notes:
+      - "Read-only grammar exposure."
+      - "Exposes the inherited 9-space ontology coordinate system to agents."
+  - key: mcp.ontology_query
+    status: implemented
+    description: "Run hybrid ontology query over MCP."
+    capability: mcp.ontology_query
+    implementation: "opencrab.mcp.tools:ontology_query"
+    writes_layers:
+      - Surface
+    touches_datasets:
+      - chroma.vectors
+    notes:
+      - "Main retrieval surface for agents."
+      - "Supports the incremental growth loop by anchoring graph exploration from partial semantic evidence."
+  - key: mcp.ontology_add_node
+    status: implemented
+    description: "Add or update a node through the grammar-validated MCP surface."
+    capability: mcp.ontology_add_node
+    implementation: "opencrab.mcp.tools:ontology_add_node"
+    writes_layers:
+      - Surface
+      - Runtime
+      - Storage
+    touches_datasets:
+      - duckdb.node_documents
+      - duckdb.audit_log
+      - duckdb.ontology_nodes
+    notes:
+      - "Preserves grammar-first writes for agent-created nodes."
+      - "User-facing status payloads report `graph`, `documents`, and `registry` roles."
+  - key: mcp.ontology_add_edge
+    status: implemented
+    description: "Add a grammar-validated edge through MCP."
+    capability: mcp.ontology_add_edge
+    implementation: "opencrab.mcp.tools:ontology_add_edge"
+    writes_layers:
+      - Surface
+      - Runtime
+      - Storage
+    touches_datasets:
+      - duckdb.audit_log
+      - duckdb.ontology_edges
+    notes:
+      - "Lets agents extend partial ontology structure without bypassing relation validation."
+      - "User-facing status payloads report `graph`, `documents`, and `registry` roles."
+  - key: mcp.ontology_impact
+    status: implemented
+    description: "Analyse I1-I7 impact for a node change over MCP."
+    capability: mcp.ontology_impact
+    implementation: "opencrab.mcp.tools:ontology_impact"
+    writes_layers:
+      - Surface
+      - Runtime
+      - Storage
+    touches_datasets:
+      - duckdb.impact_records
+    notes:
+      - "Persists impact analysis records in the embedded operational store."
+  - key: mcp.ontology_rebac_check
+    status: implemented
+    description: "Check relationship-based access control over MCP."
+    capability: mcp.ontology_rebac_check
+    implementation: "opencrab.mcp.tools:ontology_rebac_check"
+    writes_layers:
+      - Surface
+      - Runtime
+    touches_datasets:
+      - duckdb.rebac_policies
+    notes:
+      - "Combines stored policy rows with graph traversal for agent-facing access checks."
+  - key: mcp.ontology_lever_simulate
+    status: implemented
+    description: "Simulate downstream outcome changes from a lever movement over MCP."
+    capability: mcp.ontology_lever_simulate
+    implementation: "opencrab.mcp.tools:ontology_lever_simulate"
+    writes_layers:
+      - Surface
+      - Runtime
+      - Storage
+    touches_datasets:
+      - duckdb.lever_simulations
+    notes:
+      - "Persists simulation records in the embedded operational store."
+  - key: mcp.ontology_extract
+    status: implemented
+    description: "Extract nodes and edges from text with the local heuristic extractor."
+    capability: mcp.ontology_extract
+    implementation: "opencrab.mcp.tools:ontology_extract"
+    writes_layers:
+      - Surface
+      - Runtime
+      - Storage
+    touches_datasets:
+      - duckdb.node_documents
+      - duckdb.audit_log
+      - duckdb.ontology_nodes
+      - duckdb.ontology_edges
+    notes:
+      - "Keeps extraction available without requiring an external LLM service."
+  - key: mcp.ontology_ingest
+    status: implemented
+    description: "Ingest text into the embedded vector and document stores over MCP."
+    capability: mcp.ontology_ingest
+    implementation: "opencrab.mcp.tools:ontology_ingest"
+    writes_layers:
+      - Surface
+      - Runtime
+      - Storage
+    touches_datasets:
+      - duckdb.source_documents
+      - chroma.vectors
+    notes:
+      - "Preserves the agent-facing ingest seam while staying fully local-first."
+      - "User-facing status payloads report `vectors` and `documents` roles."

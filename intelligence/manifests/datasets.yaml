@@ -1,0 +1,68 @@
+metadata:
+  status: Active
+  source_of_truth: false
+  last_updated: 2026-03-26
+  purpose: "Canonical dataset names used by actions and docs."
+
+datasets:
+  - dataset_key: duckdb.node_documents
+    canonical_shape: intelligence/schemas/duckdb_contracts.sql
+    used_by_actions:
+      - mcp.ontology_add_node
+      - mcp.ontology_extract
+      - script.dogfood_mcp
+      - script.seed
+  - dataset_key: duckdb.source_documents
+    canonical_shape: intelligence/schemas/duckdb_contracts.sql
+    used_by_actions:
+      - cli.ingest
+      - mcp.ontology_ingest
+      - script.dogfood_mcp
+      - script.seed
+  - dataset_key: duckdb.audit_log
+    canonical_shape: intelligence/schemas/duckdb_contracts.sql
+    used_by_actions:
+      - mcp.ontology_add_node
+      - mcp.ontology_add_edge
+      - mcp.ontology_extract
+      - script.dogfood_mcp
+      - script.seed
+  - dataset_key: duckdb.ontology_nodes
+    canonical_shape: intelligence/schemas/duckdb_contracts.sql
+    used_by_actions:
+      - mcp.ontology_add_node
+      - mcp.ontology_extract
+      - script.dogfood_mcp
+      - script.seed
+  - dataset_key: duckdb.ontology_edges
+    canonical_shape: intelligence/schemas/duckdb_contracts.sql
+    used_by_actions:
+      - mcp.ontology_add_edge
+      - mcp.ontology_extract
+      - script.dogfood_mcp
+      - script.seed
+  - dataset_key: duckdb.rebac_policies
+    canonical_shape: intelligence/schemas/duckdb_contracts.sql
+    used_by_actions:
+      - mcp.ontology_rebac_check
+      - script.dogfood_mcp
+      - script.seed
+  - dataset_key: duckdb.impact_records
+    canonical_shape: intelligence/schemas/duckdb_contracts.sql
+    used_by_actions:
+      - mcp.ontology_impact
+      - script.dogfood_mcp
+  - dataset_key: duckdb.lever_simulations
+    canonical_shape: intelligence/schemas/duckdb_contracts.sql
+    used_by_actions:
+      - mcp.ontology_lever_simulate
+      - script.dogfood_mcp
+  - dataset_key: chroma.vectors
+    canonical_shape: intelligence/schemas/duckdb_contracts.sql
+    used_by_actions:
+      - cli.ingest
+      - cli.query
+      - mcp.ontology_ingest
+      - script.dogfood_mcp
+      - script.seed
+      - mcp.ontology_query

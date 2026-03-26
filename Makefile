@@ -1,4 +1,4 @@
-.PHONY: help install dev-install status serve query manifest lint format test coverage seed
+.PHONY: help install dev-install status serve query manifest lint format test coverage seed test-py312 coverage-py312 dogfood-mcp
 
 PYTHON := python
 PIP    := pip
@@ -17,7 +17,9 @@ help:
 	@echo "  make lint          Run ruff linter"
 	@echo "  make format        Run black + isort"
 	@echo "  make test          Run test suite"
+	@echo "  make test-py312    Run canonical Python 3.12 test suite"
 	@echo "  make coverage      Run tests with coverage report"
+	@echo "  make dogfood-mcp   Run local stdio MCP dogfood scenarios"
 
 install:
 	$(PIP) install -e .
@@ -47,6 +49,16 @@ format:
 test:
 	$(PYTEST) tests/ -v
 
+test-py312:
+	py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py
+
 coverage:
 	$(PYTEST) tests/ --cov=opencrab --cov-report=term-missing --cov-report=html
 	@echo "HTML report: htmlcov/index.html"
+
+coverage-py312:
+	py -3.12 -m pytest tests/ --cov=opencrab --cov-report=term-missing --cov-report=html
+	@echo "HTML report: htmlcov/index.html"
+
+dogfood-mcp:
+	py -3.12 scripts/dogfood_mcp.py

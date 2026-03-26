@@ -1,6 +1,8 @@
 # little-crab
 
-Local-first fork of OpenCrab.
+little-crab is a local-first fork of OpenCrab built to keep the original ontology grammar and agentic workflow while removing the heavy server database stack.
+
+This project exists to make the OpenCrab idea run well on a single machine. Instead of requiring Neo4j, MongoDB, and PostgreSQL services, little-crab keeps the grammar, validator, MCP tool surface, and agentic ontology loop, but runs them on embedded local stores.
 
 little-crab keeps the original MetaOntology grammar, validator behavior, MCP tool surface, and agentic ontology loop, but removes the legacy service stack. The runtime is now embedded only:
 
@@ -33,6 +35,7 @@ The Python package name is `little-crab`. The CLI exposes both `little-crab` and
 - no Docker requirement
 - no Neo4j, MongoDB, or PostgreSQL dependency
 - local-first runtime only
+- designed to preserve OpenCrab semantics while making day-to-day local use practical
 
 ---
 
@@ -41,7 +44,7 @@ The Python package name is `little-crab`. The CLI exposes both `little-crab` and
 ### 1. Install
 
 ```bash
-pip install -e ".[dev]"
+py -3.12 -m pip install -e ".[dev]"
 ```
 
 ### 2. Initialize local config
@@ -70,7 +73,7 @@ little-crab status
 ### 4. Seed example data
 
 ```bash
-python scripts/seed_ontology.py
+py -3.12 scripts/seed_ontology.py
 ```
 
 ### 5. Run a query
@@ -137,9 +140,17 @@ opencrab <same-command>
 make dev-install
 make seed
 make status
-make test
+make test-py312
+make dogfood-mcp
 make lint
 make format
+```
+
+Canonical Windows verification:
+
+```bash
+py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py
+py -3.12 scripts/dogfood_mcp.py
 ```
 
 ### Project structure

@@ -1,0 +1,11 @@
+policies:
+  runtime_current_truth:
+    rule: "little-crab is local-only."
+  preserve_opencrab_semantics:
+    rule: "Preserve OpenCrab grammar, validator behavior, MCP tool naming, and the agentic ontology growth loop unless an explicit architecture decision says otherwise."
+  compatibility_namespace:
+    rule: "opencrab module naming is intentional compatibility, not live legacy storage."
+  docs_sync:
+    rule: "Changes to CLI, MCP, grammar, or stores require docs updates in the same task."
+  no_service_stack:
+    rule: "Do not reintroduce service-backed DB infrastructure without explicit architecture review."

@@ -69,7 +69,7 @@ class TestToolDispatch:
         with patch("opencrab.mcp.tools._get_context") as mock_ctx:
             builder = MagicMock()
             builder.add_node.side_effect = ValueError("Unknown space 'badspace'.")
-            mock_ctx.return_value = {"builder": builder, "rebac": MagicMock(), "impact": MagicMock(), "hybrid": MagicMock(), "mongo": MagicMock()}
+            mock_ctx.return_value = {"builder": builder, "rebac": MagicMock(), "impact": MagicMock(), "hybrid": MagicMock(), "documents": MagicMock()}
 
             result = dispatch_tool("ontology_add_node", {
                 "space": "badspace", "node_type": "User", "node_id": "u1"
@@ -84,11 +84,11 @@ class TestToolDispatch:
             builder = MagicMock()
             builder.add_node.return_value = {
                 "node_id": "u1", "space": "subject", "node_type": "User",
-                "properties": {}, "stores": {"neo4j": "ok"}
+                "properties": {}, "stores": {"graph": "ok"}
             }
             mock_ctx.return_value = {
                 "builder": builder, "rebac": MagicMock(),
-                "impact": MagicMock(), "hybrid": MagicMock(), "mongo": MagicMock(),
+                "impact": MagicMock(), "hybrid": MagicMock(), "documents": MagicMock(),
             }
             result = dispatch_tool("ontology_add_node", {
                 "space": "subject", "node_type": "User", "node_id": "u1"
@@ -105,11 +105,11 @@ class TestToolDispatch:
                 "from": {"space": "subject", "id": "u1"},
                 "relation": "owns",
                 "to": {"space": "resource", "id": "doc1"},
-                "stores": {"neo4j": "ok"},
+                "stores": {"graph": "ok"},
             }
             mock_ctx.return_value = {
                 "builder": builder, "rebac": MagicMock(),
-                "impact": MagicMock(), "hybrid": MagicMock(), "mongo": MagicMock(),
+                "impact": MagicMock(), "hybrid": MagicMock(), "documents": MagicMock(),
             }
             result = dispatch_tool("ontology_add_edge", {
                 "from_space": "subject", "from_id": "u1",
@@ -126,7 +126,7 @@ class TestToolDispatch:
             builder.add_edge.side_effect = ValueError("Relation 'mentions' is not valid")
             mock_ctx.return_value = {
                 "builder": builder, "rebac": MagicMock(),
-                "impact": MagicMock(), "hybrid": MagicMock(), "mongo": MagicMock(),
+                "impact": MagicMock(), "hybrid": MagicMock(), "documents": MagicMock(),
             }
             result = dispatch_tool("ontology_add_edge", {
                 "from_space": "subject", "from_id": "u1",
@@ -148,7 +148,7 @@ class TestToolDispatch:
             hybrid.query.return_value = [mock_result]
             mock_ctx.return_value = {
                 "builder": MagicMock(), "rebac": MagicMock(),
-                "impact": MagicMock(), "hybrid": hybrid, "mongo": MagicMock(),
+                "impact": MagicMock(), "hybrid": hybrid, "documents": MagicMock(),
             }
             result = dispatch_tool("ontology_query", {"question": "What is a lever?"})
             assert "results" in result
@@ -169,7 +169,7 @@ class TestToolDispatch:
             impact_engine.analyse.return_value = mock_impact
             mock_ctx.return_value = {
                 "builder": MagicMock(), "rebac": MagicMock(),
-                "impact": impact_engine, "hybrid": MagicMock(), "mongo": MagicMock(),
+                "impact": impact_engine, "hybrid": MagicMock(), "documents": MagicMock(),
             }
             result = dispatch_tool("ontology_impact", {"node_id": "n1", "change_type": "update"})
             assert result["node_id"] == "n1"
@@ -188,7 +188,7 @@ class TestToolDispatch:
             rebac.check.return_value = decision
             mock_ctx.return_value = {
                 "builder": MagicMock(), "rebac": rebac,
-                "impact": MagicMock(), "hybrid": MagicMock(), "mongo": MagicMock(),
+                "impact": MagicMock(), "hybrid": MagicMock(), "documents": MagicMock(),
             }
             result = dispatch_tool("ontology_rebac_check", {
                 "subject_id": "u1", "permission": "view", "resource_id": "doc1"
@@ -207,7 +207,7 @@ class TestToolDispatch:
             }
             mock_ctx.return_value = {
                 "builder": MagicMock(), "rebac": MagicMock(),
-                "impact": impact_engine, "hybrid": MagicMock(), "mongo": MagicMock(),
+                "impact": impact_engine, "hybrid": MagicMock(), "documents": MagicMock(),
             }
             result = dispatch_tool("ontology_lever_simulate", {
                 "lever_id": "lev1", "direction": "raises", "magnitude": 0.8
@@ -222,15 +222,15 @@ class TestToolDispatch:
             hybrid = MagicMock()
             hybrid.ingest.return_value = {
                 "source_id": "src1",
-                "stores": {"chromadb": "ok (id=src1)"},
+                "stores": {"vectors": "ok (id=src1)"},
                 "vector_id": "src1",
             }
-            mongo = MagicMock()
-            mongo.available = True
-            mongo.upsert_source.return_value = "mongo-id-1"
+            documents = MagicMock()
+            documents.available = True
+            documents.upsert_source.return_value = "doc-id-1"
             mock_ctx.return_value = {
                 "builder": MagicMock(), "rebac": MagicMock(),
-                "impact": MagicMock(), "hybrid": hybrid, "mongo": mongo,
+                "impact": MagicMock(), "hybrid": hybrid, "documents": documents,
             }
             result = dispatch_tool("ontology_ingest", {
                 "text": "This is a test document about ontologies.",
@@ -238,7 +238,7 @@ class TestToolDispatch:
                 "metadata": {"space": "evidence"},
             })
             assert result["source_id"] == "src1"
-            assert "chromadb" in result["stores"]
+            assert "vectors" in result["stores"]
             assert result["text_length"] > 0
 
     def test_ontology_extract_works_without_external_llm(self):
@@ -246,14 +246,14 @@ class TestToolDispatch:
 
         with patch("opencrab.mcp.tools._get_context") as mock_ctx:
             builder = MagicMock()
-            builder.add_node.return_value = {"stores": {"neo4j": "ok"}}
-            builder.add_edge.return_value = {"stores": {"neo4j": "ok"}}
+            builder.add_node.return_value = {"stores": {"graph": "ok"}}
+            builder.add_edge.return_value = {"stores": {"graph": "ok"}}
             mock_ctx.return_value = {
                 "builder": builder,
                 "rebac": MagicMock(),
                 "impact": MagicMock(),
                 "hybrid": MagicMock(),
-                "mongo": MagicMock(),
+                "documents": MagicMock(),
             }
 
             result = dispatch_tool(
@@ -404,9 +404,9 @@ class TestOntologyBuilder:
         assert result["space"] == "subject"
         assert result["node_type"] == "User"
         assert "stores" in result
-        assert result["stores"]["neo4j"] == "ok"
-        assert result["stores"]["mongodb"].startswith("ok")
-        assert result["stores"]["postgres"] == "ok"
+        assert result["stores"]["graph"] == "ok"
+        assert result["stores"]["documents"].startswith("ok")
+        assert result["stores"]["registry"] == "ok"
 
     def test_add_node_invalid_space(self, builder):
         with pytest.raises(ValueError, match="badspace"):
@@ -421,7 +421,7 @@ class TestOntologyBuilder:
         builder.add_node("resource", "Project", "p1")
         result = builder.add_edge("subject", "u1", "owns", "resource", "p1")
         assert result["relation"] == "owns"
-        assert result["stores"]["postgres"] == "ok"
+        assert result["stores"]["registry"] == "ok"
 
     def test_add_edge_invalid_relation(self, builder):
         with pytest.raises(ValueError):

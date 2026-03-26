@@ -90,19 +90,19 @@ class OntologyBuilder:
                     properties=props,
                     space_id=space,
                 )
-                output["stores"]["neo4j"] = "ok"
+                output["stores"]["graph"] = "ok"
                 output["node_data"] = node_props
             except Exception as exc:
                 logger.warning("Graph node write failed for %s: %s", node_id, exc)
-                output["stores"]["neo4j"] = f"error: {exc}"
+                output["stores"]["graph"] = f"error: {exc}"
         else:
-            output["stores"]["neo4j"] = "unavailable"
+            output["stores"]["graph"] = "unavailable"
 
         # --- Document/audit write ---
         if self._mongo.available:
             try:
                 mongo_id = self._mongo.upsert_node_doc(space, node_type, node_id, props)
-                output["stores"]["mongodb"] = f"ok (id={mongo_id})"
+                output["stores"]["documents"] = f"ok (id={mongo_id})"
                 self._mongo.log_event(
                     "node_upsert",
                     subject_id=None,
@@ -110,20 +110,20 @@ class OntologyBuilder:
                 )
             except Exception as exc:
                 logger.warning("Document store node write failed for %s: %s", node_id, exc)
-                output["stores"]["mongodb"] = f"error: {exc}"
+                output["stores"]["documents"] = f"error: {exc}"
         else:
-            output["stores"]["mongodb"] = "unavailable"
+            output["stores"]["documents"] = "unavailable"
 
         # --- Registry write ---
         if self._sql.available:
             try:
                 self._sql.register_node(space, node_type, node_id)
-                output["stores"]["postgres"] = "ok"
+                output["stores"]["registry"] = "ok"
             except Exception as exc:
                 logger.warning("SQL node registry write failed for %s: %s", node_id, exc)
-                output["stores"]["postgres"] = f"error: {exc}"
+                output["stores"]["registry"] = f"error: {exc}"
         else:
-            output["stores"]["postgres"] = "unavailable"
+            output["stores"]["registry"] = "unavailable"
 
         logger.info("Node added: %s/%s (%s)", space, node_id, node_type)
         return output
@@ -209,23 +209,23 @@ class OntologyBuilder:
         if self._neo4j.available:
             try:
                 ok = self._neo4j.upsert_edge(from_type, from_id, relation, to_type, to_id, props)
-                output["stores"]["neo4j"] = "ok" if ok else "no match"
+                output["stores"]["graph"] = "ok" if ok else "no match"
             except Exception as exc:
                 logger.warning("Graph edge write failed: %s", exc)
-                output["stores"]["neo4j"] = f"error: {exc}"
+                output["stores"]["graph"] = f"error: {exc}"
         else:
-            output["stores"]["neo4j"] = "unavailable"
+            output["stores"]["graph"] = "unavailable"
 
         # --- Registry write ---
         if self._sql.available:
             try:
                 self._sql.register_edge(from_space, from_id, relation, to_space, to_id)
-                output["stores"]["postgres"] = "ok"
+                output["stores"]["registry"] = "ok"
             except Exception as exc:
                 logger.warning("SQL edge registry failed: %s", exc)
-                output["stores"]["postgres"] = f"error: {exc}"
+                output["stores"]["registry"] = f"error: {exc}"
         else:
-            output["stores"]["postgres"] = "unavailable"
+            output["stores"]["registry"] = "unavailable"
 
         # --- Document/audit write ---
         if self._mongo.available:
@@ -240,9 +240,9 @@ class OntologyBuilder:
                     "to_id": to_id,
                 },
             )
-            output["stores"]["mongodb"] = "audited"
+            output["stores"]["documents"] = "audited"
         else:
-            output["stores"]["mongodb"] = "unavailable"
+            output["stores"]["documents"] = "unavailable"
 
         logger.info("Edge added: %s/%s -[%s]-> %s/%s", from_space, from_id, relation, to_space, to_id)
         return output

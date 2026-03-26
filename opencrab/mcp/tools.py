@@ -59,9 +59,9 @@ def _get_context() -> dict[str, Any]:
     hybrid = HybridQuery(vector, graph)
 
     _context = {
-        "neo4j": graph,
-        "chroma": vector,
-        "mongo": docs,
+        "graph": graph,
+        "vectors": vector,
+        "documents": docs,
         "sql": sql,
         "builder": builder,
         "rebac": rebac,
@@ -404,18 +404,18 @@ def ontology_ingest(
         if "vector_id" in vector_result:
             result["vector_id"] = vector_result["vector_id"]
     except Exception as exc:
-        result["stores"]["chromadb"] = f"error: {exc}"
+        result["stores"]["vectors"] = f"error: {exc}"
 
     # Ingest into the document store
-    mongo: Any = ctx["mongo"]
-    if mongo.available:
+    documents: Any = ctx["documents"]
+    if documents.available:
         try:
-            mongo_id = mongo.upsert_source(source_id, text, meta)
-            result["stores"]["mongodb"] = f"ok (id={mongo_id})"
+            document_id = documents.upsert_source(source_id, text, meta)
+            result["stores"]["documents"] = f"ok (id={document_id})"
         except Exception as exc:
-            result["stores"]["mongodb"] = f"error: {exc}"
+            result["stores"]["documents"] = f"error: {exc}"
     else:
-        result["stores"]["mongodb"] = "unavailable"
+        result["stores"]["documents"] = "unavailable"
 
     result["text_length"] = len(text)
     result["metadata"] = meta

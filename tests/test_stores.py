@@ -306,9 +306,9 @@ class TestLocalRuntime:
 
         result = builder.add_node("subject", "User", "u1", {"name": "Alice"})
 
-        assert result["stores"]["mongodb"].startswith("ok")
-        assert result["stores"]["postgres"] == "ok"
-        assert result["stores"]["neo4j"] == "ok"
+        assert result["stores"]["documents"].startswith("ok")
+        assert result["stores"]["registry"] == "ok"
+        assert result["stores"]["graph"] == "ok"
         assert store.get_node_doc("subject", "u1") is not None
         assert store.table_counts()["ontology_nodes"] == 1
         assert len(store.get_audit_log()) == 1
