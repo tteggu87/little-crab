@@ -15,6 +15,7 @@ import threading
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +126,17 @@ class DuckDBStore:
                 granted BOOLEAN NOT NULL DEFAULT TRUE,
                 created_at TIMESTAMP NOT NULL DEFAULT current_timestamp,
                 PRIMARY KEY(subject_id, permission, resource_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS staged_operations (
+                stage_id TEXT PRIMARY KEY,
+                entry_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'draft',
+                created_at TIMESTAMP NOT NULL DEFAULT current_timestamp,
+                published_at TIMESTAMP,
+                publish_result_json TEXT NOT NULL DEFAULT '{}'
             )
             """,
         ]
@@ -594,6 +606,167 @@ class DuckDBStore:
     # Stats
     # ------------------------------------------------------------------
 
+    def stage_node(
+        self,
+        space: str,
+        node_type: str,
+        node_id: str,
+        properties: dict[str, Any],
+    ) -> str:
+        if not self._available:
+            raise RuntimeError("DuckDB store is not available.")
+
+        stage_id = f"stage-{uuid4().hex[:12]}"
+        payload = {
+            "space": space,
+            "node_type": node_type,
+            "node_id": node_id,
+            "properties": properties,
+        }
+        with self._connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO staged_operations
+                    (stage_id, entry_type, payload_json, status, publish_result_json)
+                VALUES (?, 'node', ?, 'draft', '{}')
+                """,
+                [stage_id, self._json_dump(payload)],
+            )
+        return stage_id
+
+    def stage_edge(
+        self,
+        from_space: str,
+        from_id: str,
+        relation: str,
+        to_space: str,
+        to_id: str,
+        properties: dict[str, Any] | None = None,
+    ) -> str:
+        if not self._available:
+            raise RuntimeError("DuckDB store is not available.")
+
+        stage_id = f"stage-{uuid4().hex[:12]}"
+        payload = {
+            "from_space": from_space,
+            "from_id": from_id,
+            "relation": relation,
+            "to_space": to_space,
+            "to_id": to_id,
+            "properties": properties or {},
+        }
+        with self._connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO staged_operations
+                    (stage_id, entry_type, payload_json, status, publish_result_json)
+                VALUES (?, 'edge', ?, 'draft', '{}')
+                """,
+                [stage_id, self._json_dump(payload)],
+            )
+        return stage_id
+
+    def get_staged_operation(self, stage_id: str) -> dict[str, Any] | None:
+        if not self._available:
+            raise RuntimeError("DuckDB store is not available.")
+
+        with self._connection() as conn:
+            row = conn.execute(
+                """
+                SELECT stage_id, entry_type, payload_json, status,
+                       created_at, published_at, publish_result_json
+                FROM staged_operations
+                WHERE stage_id = ?
+                """,
+                [stage_id],
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "stage_id": row[0],
+            "entry_type": row[1],
+            "payload": self._json_load(row[2]),
+            "status": row[3],
+            "created_at": str(row[4]),
+            "published_at": str(row[5]) if row[5] is not None else None,
+            "publish_result": self._json_load(row[6]),
+        }
+
+    def list_staged_operations(
+        self,
+        status: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        if not self._available:
+            raise RuntimeError("DuckDB store is not available.")
+
+        query = """
+            SELECT stage_id, entry_type, payload_json, status,
+                   created_at, published_at, publish_result_json
+            FROM staged_operations
+        """
+        params: list[Any] = []
+        if status:
+            query += " WHERE status = ?"
+            params.append(status)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+
+        with self._connection() as conn:
+            rows = conn.execute(query, params).fetchall()
+        return [
+            {
+                "stage_id": row[0],
+                "entry_type": row[1],
+                "payload": self._json_load(row[2]),
+                "status": row[3],
+                "created_at": str(row[4]),
+                "published_at": str(row[5]) if row[5] is not None else None,
+                "publish_result": self._json_load(row[6]),
+            }
+            for row in rows
+        ]
+
+    def mark_staged_published(
+        self,
+        stage_id: str,
+        publish_result: dict[str, Any] | None = None,
+    ) -> None:
+        if not self._available:
+            raise RuntimeError("DuckDB store is not available.")
+
+        now = self._now()
+        with self._connection() as conn:
+            conn.execute(
+                """
+                UPDATE staged_operations
+                SET status = 'published',
+                    published_at = ?,
+                    publish_result_json = ?
+                WHERE stage_id = ?
+                """,
+                [now, self._json_dump(publish_result or {}), stage_id],
+            )
+
+    def mark_staged_failed(
+        self,
+        stage_id: str,
+        publish_result: dict[str, Any] | None = None,
+    ) -> None:
+        if not self._available:
+            raise RuntimeError("DuckDB store is not available.")
+
+        with self._connection() as conn:
+            conn.execute(
+                """
+                UPDATE staged_operations
+                SET status = 'failed',
+                    publish_result_json = ?
+                WHERE stage_id = ?
+                """,
+                [self._json_dump(publish_result or {}), stage_id],
+            )
+
     def collection_stats(self) -> dict[str, int]:
         if not self._available:
             return {}
@@ -616,6 +789,7 @@ class DuckDBStore:
             "impact_records",
             "lever_simulations",
             "rebac_policies",
+            "staged_operations",
         ]
         return {table: self._count(table) for table in tables}
 

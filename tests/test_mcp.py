@@ -28,11 +28,13 @@ class TestToolDispatch:
     def test_tools_list_not_empty(self):
         from opencrab.mcp.tools import TOOLS
 
-        assert len(TOOLS) == 9  # 9 tools defined (includes ontology_extract)
+        assert len(TOOLS) == 11
         names = [t["name"] for t in TOOLS]
         assert "ontology_manifest" in names
         assert "ontology_add_node" in names
+        assert "ontology_bulk_add_nodes" in names
         assert "ontology_add_edge" in names
+        assert "ontology_bulk_add_edges" in names
         assert "ontology_query" in names
         assert "ontology_impact" in names
         assert "ontology_rebac_check" in names
@@ -136,6 +138,71 @@ class TestToolDispatch:
             assert "error" in result
             assert result.get("valid") is False
 
+    def test_ontology_bulk_add_nodes_success(self):
+        from opencrab.mcp.tools import dispatch_tool
+
+        with patch("opencrab.mcp.tools._get_context") as mock_ctx:
+            builder = MagicMock()
+            builder.add_nodes.return_value = {
+                "requested": 2,
+                "added": 2,
+                "failed": 0,
+                "results": [],
+            }
+            mock_ctx.return_value = {
+                "builder": builder,
+                "rebac": MagicMock(),
+                "impact": MagicMock(),
+                "hybrid": MagicMock(),
+                "documents": MagicMock(),
+            }
+            result = dispatch_tool(
+                "ontology_bulk_add_nodes",
+                {
+                    "nodes": [
+                        {"space": "subject", "node_type": "User", "node_id": "u1"},
+                        {"space": "resource", "node_type": "Document", "node_id": "d1"},
+                    ]
+                },
+            )
+            assert result["requested"] == 2
+            assert result["added"] == 2
+
+    def test_ontology_bulk_add_edges_success(self):
+        from opencrab.mcp.tools import dispatch_tool
+
+        with patch("opencrab.mcp.tools._get_context") as mock_ctx:
+            builder = MagicMock()
+            builder.add_edges.return_value = {
+                "requested": 1,
+                "added": 1,
+                "failed": 0,
+                "results": [],
+            }
+            mock_ctx.return_value = {
+                "builder": builder,
+                "rebac": MagicMock(),
+                "impact": MagicMock(),
+                "hybrid": MagicMock(),
+                "documents": MagicMock(),
+            }
+            result = dispatch_tool(
+                "ontology_bulk_add_edges",
+                {
+                    "edges": [
+                        {
+                            "from_space": "subject",
+                            "from_id": "u1",
+                            "relation": "owns",
+                            "to_space": "resource",
+                            "to_id": "doc1",
+                        }
+                    ]
+                },
+            )
+            assert result["requested"] == 1
+            assert result["added"] == 1
+
     def test_ontology_query_returns_results(self):
         from opencrab.mcp.tools import dispatch_tool
         from opencrab.ontology.context_pipeline import AgentContextBundle, AgentFact
@@ -149,6 +216,7 @@ class TestToolDispatch:
                         score=0.9,
                         text="Test text",
                         metadata={},
+                        status="confirmed",
                     )
                 ],
                 supporting_evidence=[],
@@ -173,6 +241,8 @@ class TestToolDispatch:
             assert "results" in result
             assert "context" in result
             assert result["total"] == 1
+            assert result["confirmed_facts"] == 1
+            assert result["inferred_facts"] == 0
             assert result["results"][0]["node_id"] == "n1"
 
     def test_ontology_impact_returns_analysis(self):
@@ -521,7 +591,7 @@ class TestMCPServer:
         assert response["id"] == 2
         assert "tools" in response["result"]
         tools = response["result"]["tools"]
-        assert len(tools) == 9
+        assert len(tools) == 11
 
     def test_handle_initialized_notification_without_id_returns_none(self, server):
         request = json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})
@@ -681,12 +751,53 @@ class TestOntologyBuilder:
         with pytest.raises(ValueError, match="Document"):
             builder.add_node("subject", "Document", "u1")
 
+    def test_add_nodes_batch_reports_partial_failures(self, builder):
+        result = builder.add_nodes(
+            [
+                {"space": "subject", "node_type": "User", "node_id": "u1"},
+                {"space": "badspace", "node_type": "User", "node_id": "u2"},
+            ]
+        )
+
+        assert result["requested"] == 2
+        assert result["added"] == 1
+        assert result["failed"] == 1
+        assert "error" in result["results"][1]
+
     def test_add_edge_valid(self, builder):
         builder.add_node("subject", "User", "u1")
         builder.add_node("resource", "Project", "p1")
         result = builder.add_edge("subject", "u1", "owns", "resource", "p1")
         assert result["relation"] == "owns"
         assert result["stores"]["registry"] == "ok"
+
+    def test_add_edges_batch_reports_partial_failures(self, builder):
+        builder.add_node("subject", "User", "u1")
+        builder.add_node("resource", "Project", "p1")
+
+        result = builder.add_edges(
+            [
+                {
+                    "from_space": "subject",
+                    "from_id": "u1",
+                    "relation": "owns",
+                    "to_space": "resource",
+                    "to_id": "p1",
+                },
+                {
+                    "from_space": "subject",
+                    "from_id": "u1",
+                    "relation": "mentions",
+                    "to_space": "resource",
+                    "to_id": "p1",
+                },
+            ]
+        )
+
+        assert result["requested"] == 2
+        assert result["added"] == 1
+        assert result["failed"] == 1
+        assert "error" in result["results"][1]
 
     def test_add_edge_missing_nodes_skips_registry_and_logs_failure(self, builder):
         result = builder.add_edge("subject", "u1", "owns", "resource", "p1")

@@ -36,6 +36,44 @@ class OntologyBuilder:
     # Nodes
     # ------------------------------------------------------------------
 
+    def add_nodes(self, nodes: list[dict[str, Any]]) -> dict[str, Any]:
+        """Add or update multiple nodes without aborting on the first failure."""
+        results: list[dict[str, Any]] = []
+        added = 0
+        failed = 0
+
+        for index, node in enumerate(nodes):
+            try:
+                result = self.add_node(
+                    space=str(node["space"]),
+                    node_type=str(node["node_type"]),
+                    node_id=str(node["node_id"]),
+                    properties=dict(node.get("properties") or {}),
+                )
+            except Exception as exc:
+                failed += 1
+                results.append(
+                    {
+                        "index": index,
+                        "node_id": node.get("node_id"),
+                        "error": str(exc),
+                    }
+                )
+                continue
+
+            if result.get("stores", {}).get("graph") == "ok":
+                added += 1
+            else:
+                failed += 1
+            results.append({"index": index, **result})
+
+        return {
+            "requested": len(nodes),
+            "added": added,
+            "failed": failed,
+            "results": results,
+        }
+
     def add_node(
         self,
         space: str,
@@ -169,6 +207,47 @@ class OntologyBuilder:
     # ------------------------------------------------------------------
     # Edges
     # ------------------------------------------------------------------
+
+    def add_edges(self, edges: list[dict[str, Any]]) -> dict[str, Any]:
+        """Add multiple edges without aborting on the first failure."""
+        results: list[dict[str, Any]] = []
+        added = 0
+        failed = 0
+
+        for index, edge in enumerate(edges):
+            try:
+                result = self.add_edge(
+                    from_space=str(edge["from_space"]),
+                    from_id=str(edge["from_id"]),
+                    relation=str(edge["relation"]),
+                    to_space=str(edge["to_space"]),
+                    to_id=str(edge["to_id"]),
+                    properties=dict(edge.get("properties") or {}),
+                )
+            except Exception as exc:
+                failed += 1
+                results.append(
+                    {
+                        "index": index,
+                        "from_id": edge.get("from_id"),
+                        "to_id": edge.get("to_id"),
+                        "error": str(exc),
+                    }
+                )
+                continue
+
+            if result.get("stores", {}).get("graph") == "ok":
+                added += 1
+            else:
+                failed += 1
+            results.append({"index": index, **result})
+
+        return {
+            "requested": len(edges),
+            "added": added,
+            "failed": failed,
+            "results": results,
+        }
 
     def add_edge(
         self,

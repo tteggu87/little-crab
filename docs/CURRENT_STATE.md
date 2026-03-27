@@ -50,7 +50,8 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 - There is no live Neo4j/MongoDB/PostgreSQL path.
 - The module namespace remains `opencrab` intentionally for compatibility.
 - Canonical ontology entity and relation truth lives in Ladybug.
-- Canonical documentary, provenance, registry, policy, audit, and impact truth lives in DuckDB.
+- Canonical documentary, provenance, registry, policy, audit, impact, and workflow draft state lives in DuckDB.
+- `staged_operations` in DuckDB is workflow state only; it is not canonical ontology truth until a staged write is published successfully.
 - Chroma remains a derived retrieval index, not a canonical truth store.
 
 ## Why This Fork Exists
@@ -88,9 +89,13 @@ little-crab now treats the following OpenCrab flexibility traits as explicit pre
 - `project` and `source_id_prefix` query filters intentionally keep retrieval inside caller scope by restricting vector results and disabling graph expansion.
 - Embedded runtime state can be rebuilt in-process for tests or host reloads with `opencrab.mcp.tools.reset_runtime_state()`.
 - `ontology_query` now assembles a derived `context` bundle through the read-only agent context pipeline while keeping legacy `results` for compatibility.
+- `littlecrab query` and `ontology_query` now surface trustability-oriented summary counts for confirmed facts, inferred facts, supporting evidence, provenance paths, and missing links.
 - Agent-context enrichment remains best-effort: supporting evidence or policy hint lookup failures degrade into `missing_links` and `uncertainty.notes` instead of aborting the full query response.
 - The agent context bundle is not a second SSOT; it is derived from the live local stores for agent-facing reasoning only.
 - User-facing runtime payloads now describe local roles such as `graph`, `documents`, `registry`, and `vectors` instead of removed backend brands.
+- `littlecrab doctor` now reports current runtime health and also runs an isolated write -> ingest -> query closure smoke.
+- `littlecrab stage-node`, `stage-edge`, `list-staged`, and `publish-stage` now provide a lightweight draft-before-publish workflow.
+- `ontology_bulk_add_nodes` and `ontology_bulk_add_edges` now provide batch-safe MCP write paths without changing the preserved single-write tool names.
 
 ## Compatibility Boundary
 
@@ -116,16 +121,12 @@ Current payload label migration:
 
 ## Verification Snapshot
 
-Last checked on 2026-03-27 with `py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py`:
+Last checked on 2026-03-27 with `py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py tests/test_repo_intelligence.py`:
 
+- `py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py tests/test_repo_intelligence.py` passed
+- `93` tests passed in the targeted verification slice
 - `py -3.12 scripts/verify_repo_intelligence.py` passed
-- `tests/test_stores.py` passed
-- `tests/test_mcp.py` passed
-- `tests/test_cli.py` passed
-- `py -3.12 scripts/dogfood_mcp.py --transcript-dir .codex/ralph/archive/agent-context-dogfood` passed
-- manual off-repo MCP stdio probe for `initialize -> initialized -> tools/list -> resources/list -> resources/templates/list` passed
-- manual off-repo MCP stdio probe with batched follow-up requests passed
-- fresh `LOCAL_DATA_DIR` smoke for `status -> seed -> query` passed
-- canonical MCP session evidence can now be regenerated with `py -3.12 scripts/dogfood_mcp.py --transcript-dir ...`
-- canonical MCP session evidence was generated into `docs/evidence/agent_sessions/2026-03-26-canonical`
+- `tests/test_cli.py` now covers `doctor`, trustability-oriented `query`, and staged publish flow
+- `tests/test_mcp.py` now covers the 11-tool MCP surface including batch node and edge writes
+- `tests/test_stores.py` now covers `staged_operations` lifecycle persistence
 - in shells where `pytest` resolves to Python 3.10, use the Python 3.12 launcher form above as the canonical verification command

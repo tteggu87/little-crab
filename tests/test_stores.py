@@ -229,6 +229,25 @@ class TestDuckDBStoreUnit:
         assert counts["audit_log"] == 1
         assert counts["ontology_nodes"] == 1
         assert counts["rebac_policies"] == 1
+        assert counts["staged_operations"] == 0
+
+    def test_staged_operations_lifecycle(self, store):
+        stage_id = store.stage_node("resource", "Document", "doc-1", {"name": "Draft"})
+
+        staged = store.get_staged_operation(stage_id)
+        assert staged is not None
+        assert staged["entry_type"] == "node"
+        assert staged["status"] == "draft"
+
+        store.mark_staged_published(stage_id, {"stores": {"graph": "ok"}})
+        published = store.get_staged_operation(stage_id)
+        assert published is not None
+        assert published["status"] == "published"
+        assert published["publish_result"]["stores"]["graph"] == "ok"
+
+        listed = store.list_staged_operations(status="published")
+        assert listed[0]["stage_id"] == stage_id
+        assert store.table_counts()["staged_operations"] == 1
 
     def test_second_process_can_open_same_db_file(self, tmp_path):
         from opencrab.stores.duckdb_store import DuckDBStore

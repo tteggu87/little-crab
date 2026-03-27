@@ -1,16 +1,22 @@
 metadata:
   status: Active
   source_of_truth: false
-  last_updated: 2026-03-26
+  last_updated: 2026-03-27
   purpose: "Capability bindings from action keys to concrete Python entrypoints."
 
 capabilities:
   - key: cli.init
     status: active
     implementation: "opencrab.cli:init"
+  - key: cli.serve
+    status: active
+    implementation: "opencrab.cli:serve"
   - key: cli.status
     status: active
     implementation: "opencrab.cli:status"
+  - key: cli.doctor
+    status: active
+    implementation: "opencrab.cli:doctor"
   - key: cli.ingest
     status: active
     implementation: "opencrab.cli:ingest"
@@ -20,9 +26,18 @@ capabilities:
   - key: cli.manifest
     status: active
     implementation: "opencrab.cli:manifest"
-  - key: cli.serve
+  - key: cli.stage-node
     status: active
-    implementation: "opencrab.cli:serve"
+    implementation: "opencrab.cli:stage_node"
+  - key: cli.stage-edge
+    status: active
+    implementation: "opencrab.cli:stage_edge"
+  - key: cli.list-staged
+    status: active
+    implementation: "opencrab.cli:list_staged"
+  - key: cli.publish-stage
+    status: active
+    implementation: "opencrab.cli:publish_stage"
   - key: script.seed
     status: active
     implementation: "scripts.seed_ontology:seed"
@@ -35,15 +50,21 @@ capabilities:
   - key: mcp.ontology_manifest
     status: active
     implementation: "opencrab.mcp.tools:ontology_manifest"
-  - key: mcp.ontology_query
-    status: active
-    implementation: "opencrab.mcp.tools:ontology_query"
   - key: mcp.ontology_add_node
     status: active
     implementation: "opencrab.mcp.tools:ontology_add_node"
+  - key: mcp.ontology_bulk_add_nodes
+    status: active
+    implementation: "opencrab.mcp.tools:ontology_bulk_add_nodes"
   - key: mcp.ontology_add_edge
     status: active
     implementation: "opencrab.mcp.tools:ontology_add_edge"
+  - key: mcp.ontology_bulk_add_edges
+    status: active
+    implementation: "opencrab.mcp.tools:ontology_bulk_add_edges"
+  - key: mcp.ontology_query
+    status: active
+    implementation: "opencrab.mcp.tools:ontology_query"
   - key: mcp.ontology_impact
     status: active
     implementation: "opencrab.mcp.tools:ontology_impact"

@@ -20,6 +20,8 @@ This fork intentionally preserves OpenCrab's core architectural meaning: grammar
 
 The MCP stdio surface is intentionally lightweight but now covers the client lifecycle steps that modern MCP hosts expect during startup: protocol version negotiation, `notifications/initialized`, tool discovery, empty resource discovery, and batched JSON-RPC follow-up messages.
 
+The CLI surface now also includes a runtime doctor path and a lightweight staged write workflow so single-user local operation can stay explicit without adding a heavier service layer.
+
 The same preservation goal also applies to future read models and visualization layers: they should keep incomplete knowledge visible, support non-English query paths, and preserve enough provenance depth to explain multi-step reasoning instead of collapsing it into a shallow summary.
 
 ## Data Flow
@@ -61,6 +63,7 @@ The same preservation goal also applies to future read models and visualization 
   - ReBAC policies
   - impact records
   - lever simulations
+  - staged write operations
 - `DuckDBStore` is the canonical store for documentary, provenance, registry, policy, audit, and impact truth.
 - `ChromaStore` owns text embeddings and similarity retrieval.
 - `ChromaStore` is a derived retrieval index only and must not be treated as canonical truth.
@@ -72,6 +75,7 @@ The same preservation goal also applies to future read models and visualization 
 - The OpenCrab strength being preserved is not the old service stack; it is the ontology discipline plus the agent-facing growth loop.
 - OpenCrab flexibility is part of the preserved meaning: partial knowledge must remain usable, non-English query paths should remain viable, and provenance should stay deep enough to explain multi-step links.
 - Live node and edge truth come from graph persistence first. Registry rows and successful structural audit events must not be emitted when the graph record itself was not written.
+- `staged_operations` is workflow state only. Draft staged writes must not be treated as canonical ontology truth before `publish-stage` succeeds.
 - Scoped query filters such as `project` and `source_id_prefix` intentionally disable graph expansion so hybrid results do not escape the caller's requested scope.
 - Embedded runtime state can be reset explicitly for tests and host reloads so settings and store caches rebuild against the current local configuration.
 - Agent-context enrichment is best-effort; supporting evidence and policy hint lookup failures should degrade into uncertainty and gap markers instead of aborting the full read path.

@@ -34,6 +34,10 @@ That preserved flexibility is now an explicit project goal, not an implied one. 
 - [2026-03-26-lancedb-evaluation.md](/C:/python_Github/playground/little-crab/docs/2026-03-26-lancedb-evaluation.md)
 - [2026-03-26-polaris-adaptation-for-little-crab.md](/C:/python_Github/playground/little-crab/docs/2026-03-26-polaris-adaptation-for-little-crab.md)
 
+## Reviews
+
+- [docs/reviews/README.md](/C:/python_Github/playground/little-crab/docs/reviews/README.md)
+
 ## Supporting Evidence
 
 - [AGENT_SESSION_EVIDENCE.md](/C:/python_Github/playground/little-crab/docs/AGENT_SESSION_EVIDENCE.md)
@@ -67,6 +71,10 @@ Compatibility does not require keeping removed backend brand names in user-facin
 The MCP stdio surface also now covers the baseline lifecycle hooks expected by current MCP hosts: negotiated protocol versions, `notifications/initialized`, empty resource discovery endpoints, and batched JSON-RPC follow-up requests.
 
 Agent-facing read paths now also have a single derived context ingress through the read-only agent context pipeline. This pipeline is not a second truth system; it assembles agent-consumable context from the live local stores.
+
+The current CLI surface now also includes `littlecrab doctor` for runtime closure checks and a lightweight staged write workflow through `stage-node`, `stage-edge`, `list-staged`, and `publish-stage`.
+
+The current MCP surface now includes batch-safe write helpers `ontology_bulk_add_nodes` and `ontology_bulk_add_edges` in addition to the preserved single-write tools.
 
 ## Project Intent
 

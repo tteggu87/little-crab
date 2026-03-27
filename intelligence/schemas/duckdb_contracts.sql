@@ -62,3 +62,13 @@ CREATE TABLE lever_simulations (
     magnitude DOUBLE NOT NULL,
     results_json TEXT NOT NULL
 );
+
+CREATE TABLE staged_operations (
+    stage_id TEXT PRIMARY KEY,
+    entry_type TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    published_at TIMESTAMP,
+    publish_result_json TEXT NOT NULL
+);
