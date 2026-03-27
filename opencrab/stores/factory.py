@@ -21,7 +21,8 @@ def _make_local_duckdb_store(settings: Settings) -> Any:
     store = _LOCAL_DUCKDB_STORES.get(db_path)
     if store is None:
         store = DuckDBStore(path=db_path)
-        _LOCAL_DUCKDB_STORES[db_path] = store
+        if store.available:
+            _LOCAL_DUCKDB_STORES[db_path] = store
     return store
 
 

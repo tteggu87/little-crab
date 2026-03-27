@@ -81,6 +81,9 @@ class OntologyBuilder:
             "stores": {},
         }
 
+        graph_persisted = False
+        graph_status = "unavailable"
+
         # --- Graph write ---
         if self._neo4j.available:
             try:
@@ -90,42 +93,77 @@ class OntologyBuilder:
                     properties=props,
                     space_id=space,
                 )
-                output["stores"]["graph"] = "ok"
+                graph_persisted = True
+                graph_status = "ok"
+                output["stores"]["graph"] = graph_status
                 output["node_data"] = node_props
             except Exception as exc:
                 logger.warning("Graph node write failed for %s: %s", node_id, exc)
-                output["stores"]["graph"] = f"error: {exc}"
+                graph_status = f"error: {exc}"
+                output["stores"]["graph"] = graph_status
         else:
-            output["stores"]["graph"] = "unavailable"
+            output["stores"]["graph"] = graph_status
 
         # --- Document/audit write ---
-        if self._mongo.available:
+        if graph_persisted and self._mongo.available:
             try:
                 mongo_id = self._mongo.upsert_node_doc(space, node_type, node_id, props)
-                output["stores"]["documents"] = f"ok (id={mongo_id})"
                 self._mongo.log_event(
                     "node_upsert",
                     subject_id=None,
-                    details={"space": space, "node_type": node_type, "node_id": node_id},
+                    details={
+                        "space": space,
+                        "node_type": node_type,
+                        "node_id": node_id,
+                        "graph_status": graph_status,
+                    },
                 )
+                output["stores"]["documents"] = f"ok (id={mongo_id})"
             except Exception as exc:
                 logger.warning("Document store node write failed for %s: %s", node_id, exc)
+                output["stores"]["documents"] = f"error: {exc}"
+        elif self._mongo.available:
+            try:
+                self._mongo.log_event(
+                    "node_upsert_failed",
+                    subject_id=None,
+                    details={
+                        "space": space,
+                        "node_type": node_type,
+                        "node_id": node_id,
+                        "graph_status": graph_status,
+                    },
+                )
+                output["stores"]["documents"] = "failure_audited"
+            except Exception as exc:
+                logger.warning("Document store node failure audit failed for %s: %s", node_id, exc)
                 output["stores"]["documents"] = f"error: {exc}"
         else:
             output["stores"]["documents"] = "unavailable"
 
         # --- Registry write ---
-        if self._sql.available:
+        if graph_persisted and self._sql.available:
             try:
                 self._sql.register_node(space, node_type, node_id)
                 output["stores"]["registry"] = "ok"
             except Exception as exc:
                 logger.warning("SQL node registry write failed for %s: %s", node_id, exc)
                 output["stores"]["registry"] = f"error: {exc}"
+        elif self._sql.available:
+            output["stores"]["registry"] = "skipped (graph node not persisted)"
         else:
             output["stores"]["registry"] = "unavailable"
 
-        logger.info("Node added: %s/%s (%s)", space, node_id, node_type)
+        if graph_persisted:
+            logger.info("Node added: %s/%s (%s)", space, node_id, node_type)
+        else:
+            logger.info(
+                "Node not persisted: %s/%s (%s) [%s]",
+                space,
+                node_id,
+                node_type,
+                graph_status,
+            )
         return output
 
     # ------------------------------------------------------------------

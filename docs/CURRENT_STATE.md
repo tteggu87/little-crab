@@ -19,6 +19,7 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 
 - Package scripts: [pyproject.toml](/C:/python_Github/playground/little-crab/pyproject.toml)
   - `littlecrab = opencrab.cli:main`
+  - `ltcrab = opencrab.cli:main`
   - `little-crab = opencrab.cli:main`
   - `opencrab = opencrab.cli:main`
 - CLI implementation: [opencrab/cli.py](/C:/python_Github/playground/little-crab/opencrab/cli.py)
@@ -77,14 +78,17 @@ little-crab now treats the following OpenCrab flexibility traits as explicit pre
 ## Current Truth
 
 - `littlecrab` is the canonical user-facing CLI command.
-- `little-crab` and `opencrab` both resolve to the same CLI implementation as compatibility aliases.
+- `ltcrab` is the supported short CLI alias.
+- `little-crab` remains available as a legacy CLI alias.
+- `opencrab` remains available as a deprecated compatibility CLI alias.
 - The live runtime is the embedded local stack only.
 - Grammar and MCP tool naming remain aligned with upstream OpenCrab semantics.
 - The MCP stdio server now accepts negotiated protocol versions, `notifications/initialized`, `resources/list`, `resources/templates/list`, and batched JSON-RPC requests.
-- Successful edge registry rows and `edge_upsert` audit events are emitted only after the graph edge itself persists; failed graph edge writes are tracked as failed attempts instead of live edges.
+- Successful node and edge structural writes now follow graph persistence first; registry rows and success audits are emitted only after the graph record itself persists, while failed graph writes are tracked as failed attempts instead of live ontology truth.
 - `project` and `source_id_prefix` query filters intentionally keep retrieval inside caller scope by restricting vector results and disabling graph expansion.
 - Embedded runtime state can be rebuilt in-process for tests or host reloads with `opencrab.mcp.tools.reset_runtime_state()`.
 - `ontology_query` now assembles a derived `context` bundle through the read-only agent context pipeline while keeping legacy `results` for compatibility.
+- Agent-context enrichment remains best-effort: supporting evidence or policy hint lookup failures degrade into `missing_links` and `uncertainty.notes` instead of aborting the full query response.
 - The agent context bundle is not a second SSOT; it is derived from the live local stores for agent-facing reasoning only.
 - User-facing runtime payloads now describe local roles such as `graph`, `documents`, `registry`, and `vectors` instead of removed backend brands.
 
@@ -92,6 +96,7 @@ little-crab now treats the following OpenCrab flexibility traits as explicit pre
 
 - MCP tool names are preserved for OpenCrab compatibility.
 - The canonical CLI command is `littlecrab`.
+- The `ltcrab` CLI name is preserved as a short alias.
 - The `little-crab` CLI name is preserved as a legacy alias.
 - The `opencrab` Python module namespace is preserved for compatibility.
 - User-facing MCP payload labels are not preserved when the old names imply removed infrastructure.

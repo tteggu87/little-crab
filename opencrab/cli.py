@@ -80,7 +80,7 @@ def init(force: bool) -> None:
             "   [cyan]python scripts/seed_ontology.py[/cyan]\n"
             "4. Add to Claude Code MCP config:\n"
             "   [cyan]claude mcp add little-crab -- littlecrab serve[/cyan]\n\n"
-            "[dim]Compatibility aliases remain available: little-crab, opencrab[/dim]",
+            "[dim]Compatibility aliases remain available: ltcrab, little-crab, opencrab (deprecated)[/dim]",
             title="little-crab Setup",
             border_style="green",
         )

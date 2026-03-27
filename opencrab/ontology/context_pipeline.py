@@ -170,8 +170,14 @@ class AgentContextPipeline:
             source_id_prefix=request.source_id_prefix,
         )
 
+        enrichment_notes: list[str] = []
+        enrichment_gaps: list[MissingLink] = []
         facts = [self._fact_from_result(result) for result in results]
-        supporting_evidence = self._collect_supporting_evidence(facts)
+        supporting_evidence = self._collect_supporting_evidence(
+            facts,
+            enrichment_notes,
+            enrichment_gaps,
+        )
         provenance_paths = self._collect_provenance_paths(facts)
         inferred_links = self._collect_inferred_links(facts)
         missing_links = self._collect_missing_links(
@@ -180,19 +186,27 @@ class AgentContextPipeline:
             supporting_evidence,
             provenance_paths,
         )
-        policies = self._collect_policy_hints(request, facts)
+        missing_links.extend(enrichment_gaps)
+        policies = self._collect_policy_hints(
+            request,
+            facts,
+            enrichment_notes,
+            missing_links,
+        )
         raw_refs = self._collect_raw_refs(facts)
 
+        notes = (
+            []
+            if facts
+            else ["No facts matched the current request; context may be incomplete."]
+        )
+        notes.extend(enrichment_notes)
         uncertainty = {
             "partial_knowledge_possible": True,
             "scope_filters_active": not request.graph_expansion_enabled,
             "graph_expansion_enabled": request.graph_expansion_enabled,
             "fact_count": len(facts),
-            "notes": (
-                []
-                if facts
-                else ["No facts matched the current request; context may be incomplete."]
-            ),
+            "notes": notes,
         }
         scope = {
             "question": request.question,
@@ -228,7 +242,10 @@ class AgentContextPipeline:
         )
 
     def _collect_supporting_evidence(
-        self, facts: list[AgentFact]
+        self,
+        facts: list[AgentFact],
+        enrichment_notes: list[str],
+        missing_links: list[MissingLink],
     ) -> list[SupportingEvidence]:
         evidence: list[SupportingEvidence] = []
 
@@ -237,7 +254,26 @@ class AgentContextPipeline:
             if source_id:
                 stored_source = None
                 if self._documents is not None and self._documents.available:
-                    stored_source = self._documents.get_source(source_id)
+                    try:
+                        stored_source = self._documents.get_source(source_id)
+                    except Exception as exc:
+                        enrichment_notes.append(
+                            f"Supporting source lookup failed for {source_id}: {exc}"
+                        )
+                        missing_links.append(
+                            MissingLink(
+                                kind="supporting_evidence_unavailable",
+                                description=(
+                                    f"Supporting source lookup failed for {source_id}; "
+                                    "the context bundle used the retrieved fact text instead."
+                                ),
+                                suggested_next_step=(
+                                    "Retry after document store recovery or inspect the source "
+                                    "document directly."
+                                ),
+                                metadata={"ref": source_id, "error": str(exc)},
+                            )
+                        )
                 evidence.append(
                     SupportingEvidence(
                         ref=source_id,
@@ -266,7 +302,30 @@ class AgentContextPipeline:
                     and self._documents is not None
                     and self._documents.available
                 ):
-                    node_doc = self._documents.get_node_doc(space, fact.node_id)
+                    try:
+                        node_doc = self._documents.get_node_doc(space, fact.node_id)
+                    except Exception as exc:
+                        enrichment_notes.append(
+                            f"Node document lookup failed for {space}/{fact.node_id}: {exc}"
+                        )
+                        missing_links.append(
+                            MissingLink(
+                                kind="supporting_evidence_unavailable",
+                                description=(
+                                    f"Node document lookup failed for {space}/{fact.node_id}; "
+                                    "the context bundle used the retrieved fact text instead."
+                                ),
+                                suggested_next_step=(
+                                    "Retry after document store recovery or inspect the ontology "
+                                    "node directly."
+                                ),
+                                metadata={
+                                    "ref": fact.node_id,
+                                    "space": space,
+                                    "error": str(exc),
+                                },
+                            )
+                        )
                 evidence.append(
                     SupportingEvidence(
                         ref=fact.node_id,
@@ -392,6 +451,8 @@ class AgentContextPipeline:
         self,
         request: AgentContextRequest,
         facts: list[AgentFact],
+        enrichment_notes: list[str],
+        missing_links: list[MissingLink],
     ) -> list[PolicyHint]:
         if not request.subject_id or not request.permission or self._operational is None:
             return []
@@ -403,11 +464,30 @@ class AgentContextPipeline:
             resource_id = fact.node_id or str(fact.metadata.get("resource_id") or "")
             if not resource_id:
                 continue
-            stored = self._operational.check_policy(
-                request.subject_id,
-                request.permission,
-                resource_id,
-            )
+            try:
+                stored = self._operational.check_policy(
+                    request.subject_id,
+                    request.permission,
+                    resource_id,
+                )
+            except Exception as exc:
+                enrichment_notes.append(
+                    f"Policy hint lookup failed for {resource_id}: {exc}"
+                )
+                missing_links.append(
+                    MissingLink(
+                        kind="policy_hint_unavailable",
+                        description=(
+                            f"Policy hint lookup failed for {resource_id}; "
+                            "the context bundle omitted policy hints for this resource."
+                        ),
+                        suggested_next_step=(
+                            "Retry after operational store recovery or inspect policies directly."
+                        ),
+                        metadata={"resource_id": resource_id, "error": str(exc)},
+                    )
+                )
+                continue
             if stored is None:
                 continue
             hints.append(

@@ -419,6 +419,52 @@ class TestToolDispatch:
         assert payload["policies"][0]["status"] == "granted"
         assert payload["provenance_paths"][0]["relation"] == "source_supports_fact"
 
+    def test_agent_context_pipeline_degrades_when_enrichment_lookups_fail(self):
+        from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
+        from opencrab.ontology.query import QueryResult
+
+        hybrid = MagicMock()
+        hybrid.query.return_value = [
+            QueryResult(
+                source="vector",
+                node_id="doc-1",
+                score=0.92,
+                text="Short summary fallback",
+                metadata={"source_id": "src-1", "space": "resource"},
+            )
+        ]
+        documents = MagicMock()
+        documents.available = True
+        documents.get_source.side_effect = RuntimeError("doc store unavailable")
+        operational = MagicMock()
+        operational.check_policy.side_effect = RuntimeError("policy store unavailable")
+
+        pipeline = AgentContextPipeline(hybrid, documents, operational)
+        bundle = pipeline.build_context(
+            AgentContextRequest(
+                question="what can alice view",
+                subject_id="alice",
+                permission="view",
+            )
+        )
+        payload = bundle.to_dict()
+
+        assert payload["facts"][0]["node_id"] == "doc-1"
+        assert payload["supporting_evidence"][0]["text_excerpt"] == "Short summary fallback"
+        assert payload["policies"] == []
+        assert {item["kind"] for item in payload["missing_links"]} == {
+            "supporting_evidence_unavailable",
+            "policy_hint_unavailable",
+        }
+        assert any(
+            "Supporting source lookup failed for src-1" in note
+            for note in payload["uncertainty"]["notes"]
+        )
+        assert any(
+            "Policy hint lookup failed for doc-1" in note
+            for note in payload["uncertainty"]["notes"]
+        )
+
 
 # ---------------------------------------------------------------------------
 # MCP Server protocol tests
@@ -603,6 +649,29 @@ class TestOntologyBuilder:
         assert result["stores"]["graph"] == "ok"
         assert result["stores"]["documents"].startswith("ok")
         assert result["stores"]["registry"] == "ok"
+
+    def test_add_node_graph_failure_skips_registry_and_logs_failure(self, tmp_path):
+        from opencrab.ontology.builder import OntologyBuilder
+        from opencrab.stores.duckdb_store import DuckDBStore
+
+        graph = MagicMock()
+        graph.available = True
+        graph.upsert_node.side_effect = RuntimeError("graph offline")
+        store = DuckDBStore(str(tmp_path / "opencrab.db"))
+        builder = OntologyBuilder(graph, store, store)
+
+        result = builder.add_node("subject", "User", "u1", {"name": "Alice"})
+
+        assert result["stores"]["graph"] == "error: graph offline"
+        assert result["stores"]["registry"] == "skipped (graph node not persisted)"
+        assert result["stores"]["documents"] == "failure_audited"
+        assert store.get_node_doc("subject", "u1") is None
+        assert store.table_counts()["ontology_nodes"] == 0
+
+        events = store.get_audit_log()
+        assert len(events) == 1
+        assert events[0]["event_type"] == "node_upsert_failed"
+        assert events[0]["details"]["graph_status"] == "error: graph offline"
 
     def test_add_node_invalid_space(self, builder):
         with pytest.raises(ValueError, match="badspace"):

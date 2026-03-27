@@ -309,6 +309,30 @@ class TestLocalFactory:
         assert first is second
         assert first.location == str(tmp_path / "chroma")
 
+    def test_factory_does_not_cache_unavailable_duckdb_store(self, monkeypatch, tmp_path):
+        from opencrab.config import Settings
+        from opencrab.stores import duckdb_store as duckdb_module
+        from opencrab.stores.factory import make_doc_store, reset_store_caches
+
+        init_count = 0
+
+        class FailingDuckDBStore:
+            def __init__(self, path):
+                nonlocal init_count
+                init_count += 1
+                self.path = path
+                self.available = False
+
+        settings = Settings(STORAGE_MODE="local", LOCAL_DATA_DIR=str(tmp_path))
+        reset_store_caches()
+        monkeypatch.setattr(duckdb_module, "DuckDBStore", FailingDuckDBStore)
+
+        first = make_doc_store(settings)
+        second = make_doc_store(settings)
+
+        assert first is not second
+        assert init_count == 2
+
 
 class TestLocalRuntime:
     def test_builder_persists_docs_registry_and_audit(self, tmp_path):

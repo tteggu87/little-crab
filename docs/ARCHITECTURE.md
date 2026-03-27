@@ -71,16 +71,18 @@ The same preservation goal also applies to future read models and visualization 
 - The MCP stdio server must remain compatible with modern host startup expectations for negotiated protocol versions, initialized notifications, empty resource discovery, and batched follow-up requests.
 - The OpenCrab strength being preserved is not the old service stack; it is the ontology discipline plus the agent-facing growth loop.
 - OpenCrab flexibility is part of the preserved meaning: partial knowledge must remain usable, non-English query paths should remain viable, and provenance should stay deep enough to explain multi-step links.
-- Live edge truth comes from graph persistence first. Registry rows and successful edge audit events must not be emitted when the graph edge itself was not written.
+- Live node and edge truth come from graph persistence first. Registry rows and successful structural audit events must not be emitted when the graph record itself was not written.
 - Scoped query filters such as `project` and `source_id_prefix` intentionally disable graph expansion so hybrid results do not escape the caller's requested scope.
 - Embedded runtime state can be reset explicitly for tests and host reloads so settings and store caches rebuild against the current local configuration.
+- Agent-context enrichment is best-effort; supporting evidence and policy hint lookup failures should degrade into uncertainty and gap markers instead of aborting the full read path.
 - Agent-facing context is derived, read-only output from `AgentContextPipeline`; it must not become a second canonical persistence layer.
 - `node_id` remains globally unique across spaces.
 - The runtime is local-only.
 - The package surface is `little-crab`, while the import namespace remains `opencrab`.
+- The canonical CLI command is `littlecrab`, with `ltcrab` as a supported short alias.
 
 ## Intentional Compatibility
 
-- The `opencrab` CLI alias is still live.
+- The `opencrab` CLI alias is still live as deprecated compatibility.
 - The old service-backed stores are removed.
 - Dated docs remain as design notes, not canonical runtime docs.

@@ -7,6 +7,8 @@ policies:
     rule: "Preserve OpenCrab flexibility as an explicit goal: keep partial knowledge visible enough for later gap-filling, avoid ASCII-only query assumptions, and preserve provenance depth sufficient to explain multi-step reasoning."
   compatibility_namespace:
     rule: "opencrab module naming is intentional compatibility, not live legacy storage."
+  cli_alias_contract:
+    rule: "The canonical user-facing CLI command is littlecrab; ltcrab is the supported short alias, little-crab is a legacy alias, and opencrab is deprecated compatibility only."
   edge_registry_truth:
     rule: "Registry rows and successful edge audit events must only be emitted after the graph edge itself persists; failed graph writes should be recorded as failed attempts instead of live edges."
   derived_agent_context:

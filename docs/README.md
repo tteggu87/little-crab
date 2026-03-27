@@ -59,7 +59,7 @@ The retained compatibility surface is package/module naming:
 
 - package name: `little-crab`
 - module namespace: `opencrab`
-- CLI commands: `littlecrab`, `little-crab`, `opencrab`
+- CLI commands: `littlecrab`, `ltcrab`, `little-crab`, `opencrab`
 - MCP tool names remain aligned with OpenCrab
 
 Compatibility does not require keeping removed backend brand names in user-facing payloads. Runtime payloads now use local-role labels such as `graph`, `documents`, `registry`, and `vectors`.

@@ -14,7 +14,7 @@ little-crab keeps the original MetaOntology grammar, validator behavior, MCP too
 - `DuckDB` for documents, audit events, registry, policies, impacts, and simulations
 - embedded `ChromaDB` for vectors
 
-The Python package name is `little-crab`. The canonical CLI command is `littlecrab`. The legacy `little-crab` and `opencrab` commands remain available as compatibility aliases.
+The Python package name is `little-crab`. The canonical CLI command is `littlecrab`. The short alias `ltcrab` is also supported. The legacy `little-crab` command remains available, and `opencrab` remains as a deprecated compatibility alias.
 
 ---
 
@@ -128,8 +128,9 @@ claude mcp add little-crab -- littlecrab serve
 You can also keep using the compatibility aliases:
 
 ```bash
+claude mcp add little-crab -- ltcrab serve
 claude mcp add little-crab -- little-crab serve
-claude mcp add little-crab -- opencrab serve
+claude mcp add little-crab -- opencrab serve   # deprecated compatibility alias
 ```
 
 ---
@@ -238,8 +239,9 @@ littlecrab manifest           Print MetaOntology grammar
 Compatibility aliases:
 
 ```text
+ltcrab <same-command>
 little-crab <same-command>
-opencrab <same-command>
+opencrab <same-command>   # deprecated
 ```
 
 ---
@@ -280,8 +282,9 @@ MCP tool names remain aligned with OpenCrab for compatibility.
 The canonical user-facing CLI command is `littlecrab`.
 
 - `littlecrab` is the preferred command in docs and examples.
+- `ltcrab` is the supported short alias for faster local use.
 - `little-crab` remains as a legacy CLI alias.
-- `opencrab` remains as a compatibility CLI alias and Python module namespace.
+- `opencrab` remains as a deprecated compatibility CLI alias and as the Python module namespace.
 
 User-facing MCP payload labels were intentionally modernized to reflect the local runtime:
 

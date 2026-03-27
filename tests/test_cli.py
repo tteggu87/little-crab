@@ -34,6 +34,7 @@ def test_cli_entrypoint_aliases_are_declared() -> None:
     scripts = project["project"]["scripts"]
 
     assert scripts["littlecrab"] == "opencrab.cli:main"
+    assert scripts["ltcrab"] == "opencrab.cli:main"
     assert scripts["little-crab"] == "opencrab.cli:main"
     assert scripts["opencrab"] == "opencrab.cli:main"
 
@@ -48,4 +49,7 @@ def test_init_guidance_prefers_littlecrab_command() -> None:
     assert result.exit_code == 0
     assert "littlecrab status" in result.output
     assert "littlecrab serve" in result.output
+    assert "ltcrab" in result.output
+    assert "opencrab" in result.output
+    assert "(deprecated)" in result.output
     assert "opencrab status" not in result.output
