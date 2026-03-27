@@ -46,6 +46,7 @@ dev = [
 
 [project.scripts]
 littlecrab = "opencrab.cli:main"
+ltcrab = "opencrab.cli:main"
 little-crab = "opencrab.cli:main"
 opencrab = "opencrab.cli:main"
 

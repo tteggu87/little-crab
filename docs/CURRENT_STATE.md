@@ -1,7 +1,7 @@
 ---
 status: Active
 source_of_truth: Yes
-last_updated: 2026-03-26
+last_updated: 2026-03-27
 superseded_by: N/A
 ---
 
@@ -19,6 +19,7 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 
 - Package scripts: [pyproject.toml](/C:/python_Github/playground/little-crab/pyproject.toml)
   - `littlecrab = opencrab.cli:main`
+  - `ltcrab = opencrab.cli:main`
   - `little-crab = opencrab.cli:main`
   - `opencrab = opencrab.cli:main`
 - CLI implementation: [opencrab/cli.py](/C:/python_Github/playground/little-crab/opencrab/cli.py)
@@ -37,6 +38,7 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 - Grammar manifest: [opencrab/grammar/manifest.py](/C:/python_Github/playground/little-crab/opencrab/grammar/manifest.py)
 - Grammar validation: [opencrab/grammar/validator.py](/C:/python_Github/playground/little-crab/opencrab/grammar/validator.py)
 - Builder: [opencrab/ontology/builder.py](/C:/python_Github/playground/little-crab/opencrab/ontology/builder.py)
+- Agent context pipeline: [opencrab/ontology/context_pipeline.py](/C:/python_Github/playground/little-crab/opencrab/ontology/context_pipeline.py)
 - Query: [opencrab/ontology/query.py](/C:/python_Github/playground/little-crab/opencrab/ontology/query.py)
 - ReBAC: [opencrab/ontology/rebac.py](/C:/python_Github/playground/little-crab/opencrab/ontology/rebac.py)
 - Impact: [opencrab/ontology/impact.py](/C:/python_Github/playground/little-crab/opencrab/ontology/impact.py)
@@ -47,6 +49,10 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 - There is no live Docker mode.
 - There is no live Neo4j/MongoDB/PostgreSQL path.
 - The module namespace remains `opencrab` intentionally for compatibility.
+- Canonical ontology entity and relation truth lives in Ladybug.
+- Canonical documentary, provenance, registry, policy, audit, impact, and workflow draft state lives in DuckDB.
+- `staged_operations` in DuckDB is workflow state only; it is not canonical ontology truth until a staged write is published successfully.
+- Chroma remains a derived retrieval index, not a canonical truth store.
 
 ## Why This Fork Exists
 
@@ -62,18 +68,40 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 - Partial knowledge is acceptable: the runtime can start with evidence or concepts first, then grow by adding missing relations later.
 - The system supports guided autonomy: agents have freedom to extend the graph, but not freedom to ignore the ontology.
 
+## Explicit Preservation Targets
+
+little-crab now treats the following OpenCrab flexibility traits as explicit preservation goals:
+
+- `partial knowledge visibility`: incomplete graph state should remain visible enough for later gap-filling instead of being flattened away by read models
+- `non-English query viability`: retrieval and investigation paths should not assume ASCII-only questions
+- `provenance depth`: evidence-to-claim-to-concept-to-outcome reasoning should remain explainable across multiple hops when the data supports it
+
 ## Current Truth
 
 - `littlecrab` is the canonical user-facing CLI command.
-- `little-crab` and `opencrab` both resolve to the same CLI implementation as compatibility aliases.
+- `ltcrab` is the supported short CLI alias.
+- `little-crab` remains available as a legacy CLI alias.
+- `opencrab` remains available as a deprecated compatibility CLI alias.
 - The live runtime is the embedded local stack only.
 - Grammar and MCP tool naming remain aligned with upstream OpenCrab semantics.
+- The MCP stdio server now accepts negotiated protocol versions, `notifications/initialized`, `resources/list`, `resources/templates/list`, and batched JSON-RPC requests.
+- Successful node and edge structural writes now follow graph persistence first; registry rows and success audits are emitted only after the graph record itself persists, while failed graph writes are tracked as failed attempts instead of live ontology truth.
+- `project` and `source_id_prefix` query filters intentionally keep retrieval inside caller scope by restricting vector results and disabling graph expansion.
+- Embedded runtime state can be rebuilt in-process for tests or host reloads with `opencrab.mcp.tools.reset_runtime_state()`.
+- `ontology_query` now assembles a derived `context` bundle through the read-only agent context pipeline while keeping legacy `results` for compatibility.
+- `littlecrab query` and `ontology_query` now surface trustability-oriented summary counts for confirmed facts, inferred facts, supporting evidence, provenance paths, and missing links.
+- Agent-context enrichment remains best-effort: supporting evidence or policy hint lookup failures degrade into `missing_links` and `uncertainty.notes` instead of aborting the full query response.
+- The agent context bundle is not a second SSOT; it is derived from the live local stores for agent-facing reasoning only.
 - User-facing runtime payloads now describe local roles such as `graph`, `documents`, `registry`, and `vectors` instead of removed backend brands.
+- `littlecrab doctor` now reports current runtime health and also runs an isolated write -> ingest -> query closure smoke.
+- `littlecrab stage-node`, `stage-edge`, `list-staged`, and `publish-stage` now provide a lightweight draft-before-publish workflow.
+- `ontology_bulk_add_nodes` and `ontology_bulk_add_edges` now provide batch-safe MCP write paths without changing the preserved single-write tool names.
 
 ## Compatibility Boundary
 
 - MCP tool names are preserved for OpenCrab compatibility.
 - The canonical CLI command is `littlecrab`.
+- The `ltcrab` CLI name is preserved as a short alias.
 - The `little-crab` CLI name is preserved as a legacy alias.
 - The `opencrab` Python module namespace is preserved for compatibility.
 - User-facing MCP payload labels are not preserved when the old names imply removed infrastructure.
@@ -93,13 +121,12 @@ Current payload label migration:
 
 ## Verification Snapshot
 
-Last checked on 2026-03-26 with `py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py`:
+Last checked on 2026-03-27 with `py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py tests/test_repo_intelligence.py`:
 
+- `py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py tests/test_repo_intelligence.py` passed
+- `93` tests passed in the targeted verification slice
 - `py -3.12 scripts/verify_repo_intelligence.py` passed
-- `tests/test_stores.py` passed
-- `tests/test_mcp.py` passed
-- `tests/test_cli.py` passed
-- fresh `LOCAL_DATA_DIR` smoke for `status -> seed -> query` passed
-- canonical MCP session evidence can now be regenerated with `py -3.12 scripts/dogfood_mcp.py --transcript-dir ...`
-- canonical MCP session evidence was generated into `docs/evidence/agent_sessions/2026-03-26-canonical`
+- `tests/test_cli.py` now covers `doctor`, trustability-oriented `query`, and staged publish flow
+- `tests/test_mcp.py` now covers the 11-tool MCP surface including batch node and edge writes
+- `tests/test_stores.py` now covers `staged_operations` lifecycle persistence
 - in shells where `pytest` resolves to Python 3.10, use the Python 3.12 launcher form above as the canonical verification command

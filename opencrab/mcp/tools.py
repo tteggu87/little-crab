@@ -8,12 +8,15 @@ schema (for tools/list) and their implementation function.
 Tools:
   1. ontology_manifest          — full grammar as JSON
   2. ontology_add_node          — add/update a node
-  3. ontology_add_edge          — add/update an edge (grammar-validated)
-  4. ontology_query             — hybrid vector + graph search
-  5. ontology_impact            — impact analysis (I1–I7)
-  6. ontology_rebac_check       — ReBAC access check
-  7. ontology_lever_simulate    — predict outcome changes from lever movement
-  8. ontology_ingest            — ingest text into vector store
+  3. ontology_bulk_add_nodes    — batch add/update nodes
+  4. ontology_add_edge          — add/update an edge (grammar-validated)
+  5. ontology_bulk_add_edges    — batch add/update edges
+  6. ontology_query             — hybrid vector + graph search
+  7. ontology_impact            — impact analysis (I1–I7)
+  8. ontology_rebac_check       — ReBAC access check
+  9. ontology_lever_simulate    — predict outcome changes from lever movement
+ 10. ontology_extract           — heuristic ontology extraction
+ 11. ontology_ingest            — ingest text into vector store
 """
 
 from __future__ import annotations
@@ -41,6 +44,7 @@ def _get_context() -> dict[str, Any]:
 
     from opencrab.config import get_settings
     from opencrab.ontology.builder import OntologyBuilder
+    from opencrab.ontology.context_pipeline import AgentContextPipeline
     from opencrab.ontology.impact import ImpactEngine
     from opencrab.ontology.query import HybridQuery
     from opencrab.ontology.rebac import ReBACEngine
@@ -57,6 +61,7 @@ def _get_context() -> dict[str, Any]:
     rebac = ReBACEngine(graph, sql)
     impact = ImpactEngine(graph, sql)
     hybrid = HybridQuery(vector, graph)
+    context_pipeline = AgentContextPipeline(hybrid, docs, sql)
 
     _context = {
         "graph": graph,
@@ -67,8 +72,21 @@ def _get_context() -> dict[str, Any]:
         "rebac": rebac,
         "impact": impact,
         "hybrid": hybrid,
+        "context_pipeline": context_pipeline,
     }
     return _context
+
+
+def reset_runtime_state() -> None:
+    """Clear cached settings, stores, and tool context for in-process reloads."""
+    global _context
+
+    from opencrab.config import reset_settings_cache
+    from opencrab.stores.factory import reset_store_caches
+
+    _context = {}
+    reset_settings_cache()
+    reset_store_caches()
 
 
 # ---------------------------------------------------------------------------
@@ -169,10 +187,34 @@ def ontology_add_edge(
         return {"error": str(exc)}
 
 
+def ontology_bulk_add_nodes(nodes: list[dict[str, Any]]) -> dict[str, Any]:
+    """Add or update multiple nodes in one request."""
+    ctx = _get_context()
+    try:
+        return ctx["builder"].add_nodes(nodes)
+    except Exception as exc:
+        logger.error("ontology_bulk_add_nodes failed: %s", exc)
+        return {"error": str(exc), "requested": len(nodes), "added": 0, "failed": len(nodes)}
+
+
+def ontology_bulk_add_edges(edges: list[dict[str, Any]]) -> dict[str, Any]:
+    """Add or update multiple edges in one request."""
+    ctx = _get_context()
+    try:
+        return ctx["builder"].add_edges(edges)
+    except Exception as exc:
+        logger.error("ontology_bulk_add_edges failed: %s", exc)
+        return {"error": str(exc), "requested": len(edges), "added": 0, "failed": len(edges)}
+
+
 def ontology_query(
     question: str,
     spaces: list[str] | None = None,
     limit: int = 10,
+    project: str | None = None,
+    source_id_prefix: str | None = None,
+    subject_id: str | None = None,
+    permission: str | None = None,
 ) -> dict[str, Any]:
     """
     Run a hybrid vector + graph query against the ontology.
@@ -185,19 +227,50 @@ def ontology_query(
         Optional list of space IDs to restrict the search.
     limit:
         Maximum number of results.
+    project:
+        Optional project metadata filter used to scope vector results.
+    source_id_prefix:
+        Optional source_id prefix used to scope vector results.
+    subject_id:
+        Optional subject ID used to add policy hints for relevant resource facts.
+    permission:
+        Optional permission label used with subject_id for policy hints.
     """
     ctx = _get_context()
     try:
-        results = ctx["hybrid"].query(
-            question=question,
-            spaces=spaces,
-            limit=limit,
+        from opencrab.ontology.context_pipeline import AgentContextRequest
+
+        bundle = ctx["context_pipeline"].build_context(
+            AgentContextRequest(
+                question=question,
+                spaces=spaces,
+                limit=limit,
+                project=project,
+                source_id_prefix=source_id_prefix,
+                subject_id=subject_id,
+                permission=permission,
+            )
         )
+        results = bundle.legacy_results()
+        confirmed_facts = sum(1 for fact in bundle.facts if fact.status == "confirmed")
+        inferred_facts = sum(1 for fact in bundle.facts if fact.status == "inferred")
         return {
             "question": question,
             "spaces_filter": spaces,
+            "project_filter": project,
+            "source_id_prefix_filter": source_id_prefix,
+            "subject_id": subject_id,
+            "permission": permission,
+            "graph_expansion": bundle.scope["graph_expansion_enabled"],
             "total": len(results),
-            "results": [r.to_dict() for r in results],
+            "confirmed_facts": confirmed_facts,
+            "inferred_facts": inferred_facts,
+            "supporting_evidence_count": len(bundle.supporting_evidence),
+            "provenance_path_count": len(bundle.provenance_paths),
+            "missing_link_count": len(bundle.missing_links),
+            "policy_hint_count": len(bundle.policies),
+            "results": results,
+            "context": bundle.to_dict(),
         }
     except Exception as exc:
         logger.error("ontology_query failed: %s", exc)
@@ -481,6 +554,54 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["from_space", "from_id", "relation", "to_space", "to_id"],
         },
     },
+    "ontology_bulk_add_nodes": {
+        "description": "Add or update multiple nodes in one batch request.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "nodes": {
+                    "type": "array",
+                    "description": "List of node objects with space, node_type, node_id, and optional properties.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "space": {"type": "string"},
+                            "node_type": {"type": "string"},
+                            "node_id": {"type": "string"},
+                            "properties": {"type": "object"},
+                        },
+                        "required": ["space", "node_type", "node_id"],
+                    },
+                }
+            },
+            "required": ["nodes"],
+        },
+    },
+    "ontology_bulk_add_edges": {
+        "description": "Add or update multiple edges in one batch request.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "edges": {
+                    "type": "array",
+                    "description": "List of edge objects with from/to spaces and ids, relation, and optional properties.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "from_space": {"type": "string"},
+                            "from_id": {"type": "string"},
+                            "relation": {"type": "string"},
+                            "to_space": {"type": "string"},
+                            "to_id": {"type": "string"},
+                            "properties": {"type": "object"},
+                        },
+                        "required": ["from_space", "from_id", "relation", "to_space", "to_id"],
+                    },
+                }
+            },
+            "required": ["edges"],
+        },
+    },
     "ontology_query": {
         "description": "Hybrid vector + graph search across the ontology.",
         "inputSchema": {
@@ -496,6 +617,22 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "type": "integer",
                     "description": "Maximum number of results (default 10).",
                     "default": 10,
+                },
+                "project": {
+                    "type": "string",
+                    "description": "Optional project metadata filter.",
+                },
+                "source_id_prefix": {
+                    "type": "string",
+                    "description": "Optional source_id prefix filter.",
+                },
+                "subject_id": {
+                    "type": "string",
+                    "description": "Optional subject ID used to add policy hints for relevant resources.",
+                },
+                "permission": {
+                    "type": "string",
+                    "description": "Optional permission used with subject_id for policy hints.",
                 },
             },
             "required": ["question"],
@@ -586,7 +723,9 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 _TOOL_FUNCTIONS: dict[str, Callable[..., Any]] = {
     "ontology_manifest": ontology_manifest,
     "ontology_add_node": ontology_add_node,
+    "ontology_bulk_add_nodes": ontology_bulk_add_nodes,
     "ontology_add_edge": ontology_add_edge,
+    "ontology_bulk_add_edges": ontology_bulk_add_edges,
     "ontology_query": ontology_query,
     "ontology_impact": ontology_impact,
     "ontology_rebac_check": ontology_rebac_check,
@@ -597,8 +736,8 @@ _TOOL_FUNCTIONS: dict[str, Callable[..., Any]] = {
 
 # Combined tool descriptor list (name + schema)
 TOOLS: list[dict[str, Any]] = [
-    {"name": name, **schema}
-    for name, schema in TOOL_SCHEMAS.items()
+    {"name": name, **TOOL_SCHEMAS[name]}
+    for name in _TOOL_FUNCTIONS
 ]
 
 

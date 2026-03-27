@@ -1,7 +1,7 @@
 metadata:
   status: Active
   source_of_truth: false
-  last_updated: 2026-03-26
+  last_updated: 2026-03-27
   purpose: "Current action contracts for the local-only runtime."
 
 actions:
@@ -15,6 +15,17 @@ actions:
     touches_datasets: []
     notes:
       - "Bootstraps local configuration."
+  - key: cli.serve
+    status: implemented
+    description: "Start the MCP stdio server."
+    capability: cli.serve
+    implementation: "opencrab.cli:serve"
+    writes_layers:
+      - Surface
+    touches_datasets: []
+    notes:
+      - "Primary agent-facing entrypoint."
+      - "Keeps the ontology directly operable by agents instead of reducing it to passive storage."
   - key: cli.status
     status: implemented
     description: "Check embedded store health."
@@ -25,6 +36,24 @@ actions:
     touches_datasets: []
     notes:
       - "Reads runtime state only."
+  - key: cli.doctor
+    status: implemented
+    description: "Run a richer runtime doctor report with isolated closure smoke."
+    capability: cli.doctor
+    implementation: "opencrab.cli:doctor"
+    writes_layers:
+      - Surface
+    touches_datasets:
+      - duckdb.node_documents
+      - duckdb.source_documents
+      - duckdb.audit_log
+      - duckdb.ontology_nodes
+      - duckdb.ontology_edges
+      - duckdb.staged_operations
+      - chroma.vectors
+    notes:
+      - "Reads current runtime health and counts."
+      - "Runs an isolated temp runtime smoke for write -> ingest -> query closure."
   - key: cli.ingest
     status: implemented
     description: "Ingest files from disk into vector and document stores."
@@ -40,16 +69,18 @@ actions:
       - "Supports both file and directory inputs."
   - key: cli.query
     status: implemented
-    description: "Run hybrid query via CLI."
+    description: "Run hybrid query via the derived agent context pipeline."
     capability: cli.query
     implementation: "opencrab.cli:query"
     writes_layers:
       - Surface
     touches_datasets:
+      - duckdb.node_documents
+      - duckdb.source_documents
       - chroma.vectors
     notes:
-      - "Combines vector retrieval and graph expansion."
-      - "Preserves the OpenCrab pattern of semantic lookup plus ontology expansion."
+      - "Combines vector retrieval and graph expansion through the derived agent context pipeline."
+      - "Surfaces confirmed vs inferred facts plus evidence, trace, and uncertainty counts."
   - key: cli.manifest
     status: implemented
     description: "Print the full MetaOntology grammar via CLI."
@@ -60,17 +91,59 @@ actions:
     touches_datasets: []
     notes:
       - "Read-only grammar inspection surface."
-  - key: cli.serve
+  - key: cli.stage-node
     status: implemented
-    description: "Start the MCP stdio server."
-    capability: cli.serve
-    implementation: "opencrab.cli:serve"
+    description: "Stage a node write in DuckDB without publishing canonical truth yet."
+    capability: cli.stage-node
+    implementation: "opencrab.cli:stage_node"
     writes_layers:
       - Surface
-    touches_datasets: []
+      - Storage
+    touches_datasets:
+      - duckdb.staged_operations
     notes:
-      - "Primary agent-facing entrypoint."
-      - "Keeps the ontology directly operable by agents instead of reducing it to passive storage."
+      - "Creates a draft staged node for later review or publish."
+  - key: cli.stage-edge
+    status: implemented
+    description: "Stage an edge write in DuckDB without publishing canonical truth yet."
+    capability: cli.stage-edge
+    implementation: "opencrab.cli:stage_edge"
+    writes_layers:
+      - Surface
+      - Storage
+    touches_datasets:
+      - duckdb.staged_operations
+    notes:
+      - "Creates a draft staged edge for later review or publish."
+  - key: cli.list-staged
+    status: implemented
+    description: "Inspect staged write operations in DuckDB."
+    capability: cli.list-staged
+    implementation: "opencrab.cli:list_staged"
+    writes_layers:
+      - Surface
+    touches_datasets:
+      - duckdb.staged_operations
+    notes:
+      - "Read-only staging queue inspection."
+  - key: cli.publish-stage
+    status: implemented
+    description: "Publish one staged write into canonical truth."
+    capability: cli.publish-stage
+    implementation: "opencrab.cli:publish_stage"
+    writes_layers:
+      - Surface
+      - Runtime
+      - Storage
+    touches_datasets:
+      - duckdb.staged_operations
+      - duckdb.node_documents
+      - duckdb.audit_log
+      - duckdb.ontology_nodes
+      - duckdb.ontology_edges
+    notes:
+      - "Publishes staged nodes or edges through the normal grammar-validated builder."
+      - "Marks failed publish attempts without promoting them to canonical truth."
   - key: script.seed
     status: implemented
     description: "Populate the local runtime with example ontology data."
@@ -134,18 +207,6 @@ actions:
     notes:
       - "Read-only grammar exposure."
       - "Exposes the inherited 9-space ontology coordinate system to agents."
-  - key: mcp.ontology_query
-    status: implemented
-    description: "Run hybrid ontology query over MCP."
-    capability: mcp.ontology_query
-    implementation: "opencrab.mcp.tools:ontology_query"
-    writes_layers:
-      - Surface
-    touches_datasets:
-      - chroma.vectors
-    notes:
-      - "Main retrieval surface for agents."
-      - "Supports the incremental growth loop by anchoring graph exploration from partial semantic evidence."
   - key: mcp.ontology_add_node
     status: implemented
     description: "Add or update a node through the grammar-validated MCP surface."
@@ -162,6 +223,22 @@ actions:
     notes:
       - "Preserves grammar-first writes for agent-created nodes."
       - "User-facing status payloads report `graph`, `documents`, and `registry` roles."
+  - key: mcp.ontology_bulk_add_nodes
+    status: implemented
+    description: "Add or update multiple nodes through the grammar-validated MCP surface."
+    capability: mcp.ontology_bulk_add_nodes
+    implementation: "opencrab.mcp.tools:ontology_bulk_add_nodes"
+    writes_layers:
+      - Surface
+      - Runtime
+      - Storage
+    touches_datasets:
+      - duckdb.node_documents
+      - duckdb.audit_log
+      - duckdb.ontology_nodes
+    notes:
+      - "Uses the same grammar-first builder path as single-node writes."
+      - "Returns requested, added, failed, and per-item results for partial-success visibility."
   - key: mcp.ontology_add_edge
     status: implemented
     description: "Add a grammar-validated edge through MCP."
@@ -177,6 +254,37 @@ actions:
     notes:
       - "Lets agents extend partial ontology structure without bypassing relation validation."
       - "User-facing status payloads report `graph`, `documents`, and `registry` roles."
+  - key: mcp.ontology_bulk_add_edges
+    status: implemented
+    description: "Add multiple grammar-validated edges through MCP."
+    capability: mcp.ontology_bulk_add_edges
+    implementation: "opencrab.mcp.tools:ontology_bulk_add_edges"
+    writes_layers:
+      - Surface
+      - Runtime
+      - Storage
+    touches_datasets:
+      - duckdb.audit_log
+      - duckdb.ontology_edges
+    notes:
+      - "Uses the same relation validation path as single-edge writes."
+      - "Returns requested, added, failed, and per-item results for partial-success visibility."
+  - key: mcp.ontology_query
+    status: implemented
+    description: "Run hybrid ontology query over MCP."
+    capability: mcp.ontology_query
+    implementation: "opencrab.mcp.tools:ontology_query"
+    writes_layers:
+      - Surface
+    touches_datasets:
+      - duckdb.node_documents
+      - duckdb.source_documents
+      - duckdb.rebac_policies
+      - chroma.vectors
+    notes:
+      - "Main retrieval surface for agents."
+      - "Supports the incremental growth loop by anchoring graph exploration from partial semantic evidence."
+      - "Returns legacy results plus derived context counts for evidence, provenance, missing links, and policy hints."
   - key: mcp.ontology_impact
     status: implemented
     description: "Analyse I1-I7 impact for a node change over MCP."

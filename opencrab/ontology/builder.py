@@ -36,6 +36,44 @@ class OntologyBuilder:
     # Nodes
     # ------------------------------------------------------------------
 
+    def add_nodes(self, nodes: list[dict[str, Any]]) -> dict[str, Any]:
+        """Add or update multiple nodes without aborting on the first failure."""
+        results: list[dict[str, Any]] = []
+        added = 0
+        failed = 0
+
+        for index, node in enumerate(nodes):
+            try:
+                result = self.add_node(
+                    space=str(node["space"]),
+                    node_type=str(node["node_type"]),
+                    node_id=str(node["node_id"]),
+                    properties=dict(node.get("properties") or {}),
+                )
+            except Exception as exc:
+                failed += 1
+                results.append(
+                    {
+                        "index": index,
+                        "node_id": node.get("node_id"),
+                        "error": str(exc),
+                    }
+                )
+                continue
+
+            if result.get("stores", {}).get("graph") == "ok":
+                added += 1
+            else:
+                failed += 1
+            results.append({"index": index, **result})
+
+        return {
+            "requested": len(nodes),
+            "added": added,
+            "failed": failed,
+            "results": results,
+        }
+
     def add_node(
         self,
         space: str,
@@ -81,6 +119,9 @@ class OntologyBuilder:
             "stores": {},
         }
 
+        graph_persisted = False
+        graph_status = "unavailable"
+
         # --- Graph write ---
         if self._neo4j.available:
             try:
@@ -90,47 +131,123 @@ class OntologyBuilder:
                     properties=props,
                     space_id=space,
                 )
-                output["stores"]["graph"] = "ok"
+                graph_persisted = True
+                graph_status = "ok"
+                output["stores"]["graph"] = graph_status
                 output["node_data"] = node_props
             except Exception as exc:
                 logger.warning("Graph node write failed for %s: %s", node_id, exc)
-                output["stores"]["graph"] = f"error: {exc}"
+                graph_status = f"error: {exc}"
+                output["stores"]["graph"] = graph_status
         else:
-            output["stores"]["graph"] = "unavailable"
+            output["stores"]["graph"] = graph_status
 
         # --- Document/audit write ---
-        if self._mongo.available:
+        if graph_persisted and self._mongo.available:
             try:
                 mongo_id = self._mongo.upsert_node_doc(space, node_type, node_id, props)
-                output["stores"]["documents"] = f"ok (id={mongo_id})"
                 self._mongo.log_event(
                     "node_upsert",
                     subject_id=None,
-                    details={"space": space, "node_type": node_type, "node_id": node_id},
+                    details={
+                        "space": space,
+                        "node_type": node_type,
+                        "node_id": node_id,
+                        "graph_status": graph_status,
+                    },
                 )
+                output["stores"]["documents"] = f"ok (id={mongo_id})"
             except Exception as exc:
                 logger.warning("Document store node write failed for %s: %s", node_id, exc)
+                output["stores"]["documents"] = f"error: {exc}"
+        elif self._mongo.available:
+            try:
+                self._mongo.log_event(
+                    "node_upsert_failed",
+                    subject_id=None,
+                    details={
+                        "space": space,
+                        "node_type": node_type,
+                        "node_id": node_id,
+                        "graph_status": graph_status,
+                    },
+                )
+                output["stores"]["documents"] = "failure_audited"
+            except Exception as exc:
+                logger.warning("Document store node failure audit failed for %s: %s", node_id, exc)
                 output["stores"]["documents"] = f"error: {exc}"
         else:
             output["stores"]["documents"] = "unavailable"
 
         # --- Registry write ---
-        if self._sql.available:
+        if graph_persisted and self._sql.available:
             try:
                 self._sql.register_node(space, node_type, node_id)
                 output["stores"]["registry"] = "ok"
             except Exception as exc:
                 logger.warning("SQL node registry write failed for %s: %s", node_id, exc)
                 output["stores"]["registry"] = f"error: {exc}"
+        elif self._sql.available:
+            output["stores"]["registry"] = "skipped (graph node not persisted)"
         else:
             output["stores"]["registry"] = "unavailable"
 
-        logger.info("Node added: %s/%s (%s)", space, node_id, node_type)
+        if graph_persisted:
+            logger.info("Node added: %s/%s (%s)", space, node_id, node_type)
+        else:
+            logger.info(
+                "Node not persisted: %s/%s (%s) [%s]",
+                space,
+                node_id,
+                node_type,
+                graph_status,
+            )
         return output
 
     # ------------------------------------------------------------------
     # Edges
     # ------------------------------------------------------------------
+
+    def add_edges(self, edges: list[dict[str, Any]]) -> dict[str, Any]:
+        """Add multiple edges without aborting on the first failure."""
+        results: list[dict[str, Any]] = []
+        added = 0
+        failed = 0
+
+        for index, edge in enumerate(edges):
+            try:
+                result = self.add_edge(
+                    from_space=str(edge["from_space"]),
+                    from_id=str(edge["from_id"]),
+                    relation=str(edge["relation"]),
+                    to_space=str(edge["to_space"]),
+                    to_id=str(edge["to_id"]),
+                    properties=dict(edge.get("properties") or {}),
+                )
+            except Exception as exc:
+                failed += 1
+                results.append(
+                    {
+                        "index": index,
+                        "from_id": edge.get("from_id"),
+                        "to_id": edge.get("to_id"),
+                        "error": str(exc),
+                    }
+                )
+                continue
+
+            if result.get("stores", {}).get("graph") == "ok":
+                added += 1
+            else:
+                failed += 1
+            results.append({"index": index, **result})
+
+        return {
+            "requested": len(edges),
+            "added": added,
+            "failed": failed,
+            "results": results,
+        }
 
     def add_edge(
         self,
@@ -205,46 +322,80 @@ class OntologyBuilder:
             except Exception:
                 pass  # use defaults
 
+        graph_persisted = False
+        graph_status = "unavailable"
+
         # --- Graph write ---
         if self._neo4j.available:
             try:
                 ok = self._neo4j.upsert_edge(from_type, from_id, relation, to_type, to_id, props)
-                output["stores"]["graph"] = "ok" if ok else "no match"
+                graph_persisted = bool(ok)
+                graph_status = "ok" if ok else "no match"
+                output["stores"]["graph"] = graph_status
             except Exception as exc:
                 logger.warning("Graph edge write failed: %s", exc)
-                output["stores"]["graph"] = f"error: {exc}"
+                graph_status = f"error: {exc}"
+                output["stores"]["graph"] = graph_status
         else:
-            output["stores"]["graph"] = "unavailable"
+            output["stores"]["graph"] = graph_status
 
         # --- Registry write ---
-        if self._sql.available:
+        if graph_persisted and self._sql.available:
             try:
                 self._sql.register_edge(from_space, from_id, relation, to_space, to_id)
                 output["stores"]["registry"] = "ok"
             except Exception as exc:
                 logger.warning("SQL edge registry failed: %s", exc)
                 output["stores"]["registry"] = f"error: {exc}"
+        elif self._sql.available:
+            output["stores"]["registry"] = "skipped (graph edge not persisted)"
         else:
             output["stores"]["registry"] = "unavailable"
 
         # --- Document/audit write ---
         if self._mongo.available:
-            self._mongo.log_event(
-                "edge_upsert",
-                subject_id=None,
-                details={
-                    "from_space": from_space,
-                    "from_id": from_id,
-                    "relation": relation,
-                    "to_space": to_space,
-                    "to_id": to_id,
-                },
-            )
-            output["stores"]["documents"] = "audited"
+            event_type = "edge_upsert" if graph_persisted else "edge_upsert_failed"
+            try:
+                self._mongo.log_event(
+                    event_type,
+                    subject_id=None,
+                    details={
+                        "from_space": from_space,
+                        "from_id": from_id,
+                        "relation": relation,
+                        "to_space": to_space,
+                        "to_id": to_id,
+                        "graph_status": graph_status,
+                    },
+                )
+                output["stores"]["documents"] = (
+                    "audited" if graph_persisted else "failure_audited"
+                )
+            except Exception as exc:
+                logger.warning("Document store edge audit failed: %s", exc)
+                output["stores"]["documents"] = f"error: {exc}"
         else:
             output["stores"]["documents"] = "unavailable"
 
-        logger.info("Edge added: %s/%s -[%s]-> %s/%s", from_space, from_id, relation, to_space, to_id)
+        if graph_persisted:
+            logger.info(
+                "Edge added: %s/%s -[%s]-> %s/%s",
+                from_space,
+                from_id,
+                relation,
+                to_space,
+                to_id,
+            )
+        else:
+            logger.info(
+                "Edge not persisted: %s/%s -[%s]-> %s/%s (%s)",
+                from_space,
+                from_id,
+                relation,
+                to_space,
+                to_id,
+                graph_status,
+            )
         return output
 
     def _assert_node_id_is_globally_unique(

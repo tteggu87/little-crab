@@ -28,11 +28,13 @@ class TestToolDispatch:
     def test_tools_list_not_empty(self):
         from opencrab.mcp.tools import TOOLS
 
-        assert len(TOOLS) == 9  # 9 tools defined (includes ontology_extract)
+        assert len(TOOLS) == 11
         names = [t["name"] for t in TOOLS]
         assert "ontology_manifest" in names
         assert "ontology_add_node" in names
+        assert "ontology_bulk_add_nodes" in names
         assert "ontology_add_edge" in names
+        assert "ontology_bulk_add_edges" in names
         assert "ontology_query" in names
         assert "ontology_impact" in names
         assert "ontology_rebac_check" in names
@@ -136,23 +138,111 @@ class TestToolDispatch:
             assert "error" in result
             assert result.get("valid") is False
 
-    def test_ontology_query_returns_results(self):
+    def test_ontology_bulk_add_nodes_success(self):
         from opencrab.mcp.tools import dispatch_tool
-        from opencrab.ontology.query import QueryResult
 
         with patch("opencrab.mcp.tools._get_context") as mock_ctx:
-            mock_result = QueryResult(
-                source="vector", node_id="n1", score=0.9, text="Test text", metadata={}
+            builder = MagicMock()
+            builder.add_nodes.return_value = {
+                "requested": 2,
+                "added": 2,
+                "failed": 0,
+                "results": [],
+            }
+            mock_ctx.return_value = {
+                "builder": builder,
+                "rebac": MagicMock(),
+                "impact": MagicMock(),
+                "hybrid": MagicMock(),
+                "documents": MagicMock(),
+            }
+            result = dispatch_tool(
+                "ontology_bulk_add_nodes",
+                {
+                    "nodes": [
+                        {"space": "subject", "node_type": "User", "node_id": "u1"},
+                        {"space": "resource", "node_type": "Document", "node_id": "d1"},
+                    ]
+                },
             )
-            hybrid = MagicMock()
-            hybrid.query.return_value = [mock_result]
+            assert result["requested"] == 2
+            assert result["added"] == 2
+
+    def test_ontology_bulk_add_edges_success(self):
+        from opencrab.mcp.tools import dispatch_tool
+
+        with patch("opencrab.mcp.tools._get_context") as mock_ctx:
+            builder = MagicMock()
+            builder.add_edges.return_value = {
+                "requested": 1,
+                "added": 1,
+                "failed": 0,
+                "results": [],
+            }
+            mock_ctx.return_value = {
+                "builder": builder,
+                "rebac": MagicMock(),
+                "impact": MagicMock(),
+                "hybrid": MagicMock(),
+                "documents": MagicMock(),
+            }
+            result = dispatch_tool(
+                "ontology_bulk_add_edges",
+                {
+                    "edges": [
+                        {
+                            "from_space": "subject",
+                            "from_id": "u1",
+                            "relation": "owns",
+                            "to_space": "resource",
+                            "to_id": "doc1",
+                        }
+                    ]
+                },
+            )
+            assert result["requested"] == 1
+            assert result["added"] == 1
+
+    def test_ontology_query_returns_results(self):
+        from opencrab.mcp.tools import dispatch_tool
+        from opencrab.ontology.context_pipeline import AgentContextBundle, AgentFact
+
+        with patch("opencrab.mcp.tools._get_context") as mock_ctx:
+            bundle = AgentContextBundle(
+                facts=[
+                    AgentFact(
+                        source="vector",
+                        node_id="n1",
+                        score=0.9,
+                        text="Test text",
+                        metadata={},
+                        status="confirmed",
+                    )
+                ],
+                supporting_evidence=[],
+                provenance_paths=[],
+                inferred_links=[],
+                missing_links=[],
+                policies=[],
+                scope={"graph_expansion_enabled": True},
+                uncertainty={"fact_count": 1},
+                raw_refs=[],
+            )
+            context_pipeline = MagicMock()
+            context_pipeline.build_context.return_value = bundle
             mock_ctx.return_value = {
                 "builder": MagicMock(), "rebac": MagicMock(),
-                "impact": MagicMock(), "hybrid": hybrid, "documents": MagicMock(),
+                "impact": MagicMock(),
+                "hybrid": MagicMock(),
+                "documents": MagicMock(),
+                "context_pipeline": context_pipeline,
             }
             result = dispatch_tool("ontology_query", {"question": "What is a lever?"})
             assert "results" in result
+            assert "context" in result
             assert result["total"] == 1
+            assert result["confirmed_facts"] == 1
+            assert result["inferred_facts"] == 0
             assert result["results"][0]["node_id"] == "n1"
 
     def test_ontology_impact_returns_analysis(self):
@@ -273,6 +363,178 @@ class TestToolDispatch:
             assert result["added_nodes"] >= 2
             assert result["added_edges"] >= 1
 
+    def test_reset_runtime_state_rebuilds_context(self, monkeypatch, tmp_path):
+        from opencrab.mcp.tools import _get_context, reset_runtime_state
+
+        first_dir = tmp_path / "first"
+        second_dir = tmp_path / "second"
+
+        monkeypatch.setenv("LOCAL_DATA_DIR", str(first_dir))
+        monkeypatch.setenv("CHROMA_COLLECTION", "reset-test-a")
+        reset_runtime_state()
+        first_ctx = _get_context()
+
+        monkeypatch.setenv("LOCAL_DATA_DIR", str(second_dir))
+        monkeypatch.setenv("CHROMA_COLLECTION", "reset-test-b")
+        reset_runtime_state()
+        second_ctx = _get_context()
+
+        assert first_ctx is not second_ctx
+        assert first_ctx["graph"] is not second_ctx["graph"]
+        assert first_ctx["documents"] is not second_ctx["documents"]
+        assert first_ctx["vectors"] is not second_ctx["vectors"]
+        assert first_ctx["context_pipeline"] is not second_ctx["context_pipeline"]
+        assert second_ctx["vectors"].location == str(second_dir / "chroma")
+
+    def test_agent_context_pipeline_builds_bundle(self):
+        from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
+        from opencrab.ontology.query import QueryResult
+
+        hybrid = MagicMock()
+        hybrid.query.return_value = [
+            QueryResult(
+                source="vector",
+                node_id="n1",
+                score=0.9,
+                text="Vector fact",
+                metadata={"source_id": "src-1", "space": "evidence"},
+            ),
+            QueryResult(
+                source="graph",
+                node_id="n2",
+                score=0.5,
+                text="Graph fact",
+                metadata={"space": "concept"},
+                graph_context={"anchor_id": "n1", "labels": ["Concept"]},
+            ),
+        ]
+        pipeline = AgentContextPipeline(hybrid)
+
+        bundle = pipeline.build_context(AgentContextRequest(question="cache ttl"))
+        payload = bundle.to_dict()
+
+        assert len(bundle.facts) == 2
+        assert payload["facts"][0]["status"] == "confirmed"
+        assert payload["facts"][1]["status"] == "inferred"
+        assert payload["scope"]["graph_expansion_enabled"] is True
+        assert payload["supporting_evidence"][0]["ref"] == "src-1"
+        assert any(
+            path["nodes"] == ["n1", "n2"] and path["relation"] == "graph_neighbor"
+            for path in payload["provenance_paths"]
+        )
+        assert payload["inferred_links"][0]["relation"] == "neighbor_of"
+        assert payload["raw_refs"][0]["ref_type"] == "node"
+
+    def test_agent_context_pipeline_emits_missing_links_for_empty_scope(self):
+        from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
+
+        hybrid = MagicMock()
+        hybrid.query.return_value = []
+        pipeline = AgentContextPipeline(hybrid)
+
+        bundle = pipeline.build_context(
+            AgentContextRequest(
+                question="unknown topic",
+                project="alpha",
+                source_id_prefix="docs/",
+            )
+        )
+        payload = bundle.to_dict()
+
+        assert payload["facts"] == []
+        assert payload["missing_links"][0]["kind"] == "no_match"
+        assert payload["missing_links"][1]["kind"] == "scope_constrained_graph_expansion"
+        assert payload["uncertainty"]["scope_filters_active"] is True
+
+    def test_agent_context_pipeline_enriches_evidence_and_policy_hints(self):
+        from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
+        from opencrab.ontology.query import QueryResult
+
+        hybrid = MagicMock()
+        hybrid.query.return_value = [
+            QueryResult(
+                source="vector",
+                node_id="doc-1",
+                score=0.92,
+                text="Short summary",
+                metadata={"source_id": "src-1", "space": "resource"},
+            )
+        ]
+        documents = MagicMock()
+        documents.available = True
+        documents.get_source.return_value = {
+            "text": "This is the longer supporting source text for doc-1.",
+            "metadata": {"project": "alpha"},
+        }
+        documents.get_node_doc.return_value = {
+            "properties": {"description": "Document node description"},
+        }
+        operational = MagicMock()
+        operational.check_policy.return_value = True
+
+        pipeline = AgentContextPipeline(hybrid, documents, operational)
+        bundle = pipeline.build_context(
+            AgentContextRequest(
+                question="what can alice view",
+                subject_id="alice",
+                permission="view",
+            )
+        )
+        payload = bundle.to_dict()
+
+        assert payload["supporting_evidence"][0]["text_excerpt"].startswith(
+            "This is the longer supporting source text"
+        )
+        assert payload["policies"][0]["subject_id"] == "alice"
+        assert payload["policies"][0]["status"] == "granted"
+        assert payload["provenance_paths"][0]["relation"] == "source_supports_fact"
+
+    def test_agent_context_pipeline_degrades_when_enrichment_lookups_fail(self):
+        from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
+        from opencrab.ontology.query import QueryResult
+
+        hybrid = MagicMock()
+        hybrid.query.return_value = [
+            QueryResult(
+                source="vector",
+                node_id="doc-1",
+                score=0.92,
+                text="Short summary fallback",
+                metadata={"source_id": "src-1", "space": "resource"},
+            )
+        ]
+        documents = MagicMock()
+        documents.available = True
+        documents.get_source.side_effect = RuntimeError("doc store unavailable")
+        operational = MagicMock()
+        operational.check_policy.side_effect = RuntimeError("policy store unavailable")
+
+        pipeline = AgentContextPipeline(hybrid, documents, operational)
+        bundle = pipeline.build_context(
+            AgentContextRequest(
+                question="what can alice view",
+                subject_id="alice",
+                permission="view",
+            )
+        )
+        payload = bundle.to_dict()
+
+        assert payload["facts"][0]["node_id"] == "doc-1"
+        assert payload["supporting_evidence"][0]["text_excerpt"] == "Short summary fallback"
+        assert payload["policies"] == []
+        assert {item["kind"] for item in payload["missing_links"]} == {
+            "supporting_evidence_unavailable",
+            "policy_hint_unavailable",
+        }
+        assert any(
+            "Supporting source lookup failed for src-1" in note
+            for note in payload["uncertainty"]["notes"]
+        )
+        assert any(
+            "Policy hint lookup failed for doc-1" in note
+            for note in payload["uncertainty"]["notes"]
+        )
+
 
 # ---------------------------------------------------------------------------
 # MCP Server protocol tests
@@ -306,15 +568,22 @@ class TestMCPServer:
         assert response["error"]["code"] == -32601  # METHOD_NOT_FOUND
 
     def test_handle_initialize(self, server):
-        request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+        request = json.dumps({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"protocolVersion": "2025-11-25"},
+        })
         response = server._handle_raw(request)
         assert response["id"] == 1
         result = response["result"]
         assert "protocolVersion" in result
+        assert result["protocolVersion"] == "2025-11-25"
         assert "serverInfo" in result
         assert result["serverInfo"]["name"] == "opencrab-test"
         assert "capabilities" in result
         assert "tools" in result["capabilities"]
+        assert "resources" in result["capabilities"]
 
     def test_handle_tools_list(self, server):
         request = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
@@ -322,7 +591,50 @@ class TestMCPServer:
         assert response["id"] == 2
         assert "tools" in response["result"]
         tools = response["result"]["tools"]
-        assert len(tools) == 9
+        assert len(tools) == 11
+
+    def test_handle_initialized_notification_without_id_returns_none(self, server):
+        request = json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        response = server._handle_raw(request)
+        assert response is None
+
+    def test_handle_initialized_notification_with_null_id_returns_none(self, server):
+        request = json.dumps({"jsonrpc": "2.0", "id": None, "method": "notifications/initialized"})
+        response = server._handle_raw(request)
+        assert response is None
+
+    def test_handle_resources_list(self, server):
+        request = json.dumps({"jsonrpc": "2.0", "id": 7, "method": "resources/list", "params": {}})
+        response = server._handle_raw(request)
+        assert response["id"] == 7
+        assert response["result"]["resources"] == []
+
+    def test_handle_resource_templates_list(self, server):
+        request = json.dumps({
+            "jsonrpc": "2.0",
+            "id": 8,
+            "method": "resources/templates/list",
+            "params": {},
+        })
+        response = server._handle_raw(request)
+        assert response["id"] == 8
+        assert response["result"]["resourceTemplates"] == []
+
+    def test_handle_batch_request(self, server):
+        batch = json.dumps(
+            [
+                {"jsonrpc": "2.0", "method": "notifications/initialized"},
+                {"jsonrpc": "2.0", "id": 9, "method": "resources/list", "params": {}},
+                {"jsonrpc": "2.0", "id": 10, "method": "resources/templates/list", "params": {}},
+            ]
+        )
+        response = server._handle_raw(batch)
+        assert isinstance(response, list)
+        assert len(response) == 2
+        assert response[0]["id"] == 9
+        assert response[0]["result"]["resources"] == []
+        assert response[1]["id"] == 10
+        assert response[1]["result"]["resourceTemplates"] == []
 
     def test_handle_tools_call_manifest(self, server):
         request = json.dumps({
@@ -408,6 +720,29 @@ class TestOntologyBuilder:
         assert result["stores"]["documents"].startswith("ok")
         assert result["stores"]["registry"] == "ok"
 
+    def test_add_node_graph_failure_skips_registry_and_logs_failure(self, tmp_path):
+        from opencrab.ontology.builder import OntologyBuilder
+        from opencrab.stores.duckdb_store import DuckDBStore
+
+        graph = MagicMock()
+        graph.available = True
+        graph.upsert_node.side_effect = RuntimeError("graph offline")
+        store = DuckDBStore(str(tmp_path / "opencrab.db"))
+        builder = OntologyBuilder(graph, store, store)
+
+        result = builder.add_node("subject", "User", "u1", {"name": "Alice"})
+
+        assert result["stores"]["graph"] == "error: graph offline"
+        assert result["stores"]["registry"] == "skipped (graph node not persisted)"
+        assert result["stores"]["documents"] == "failure_audited"
+        assert store.get_node_doc("subject", "u1") is None
+        assert store.table_counts()["ontology_nodes"] == 0
+
+        events = store.get_audit_log()
+        assert len(events) == 1
+        assert events[0]["event_type"] == "node_upsert_failed"
+        assert events[0]["details"]["graph_status"] == "error: graph offline"
+
     def test_add_node_invalid_space(self, builder):
         with pytest.raises(ValueError, match="badspace"):
             builder.add_node("badspace", "User", "u1")
@@ -416,12 +751,68 @@ class TestOntologyBuilder:
         with pytest.raises(ValueError, match="Document"):
             builder.add_node("subject", "Document", "u1")
 
+    def test_add_nodes_batch_reports_partial_failures(self, builder):
+        result = builder.add_nodes(
+            [
+                {"space": "subject", "node_type": "User", "node_id": "u1"},
+                {"space": "badspace", "node_type": "User", "node_id": "u2"},
+            ]
+        )
+
+        assert result["requested"] == 2
+        assert result["added"] == 1
+        assert result["failed"] == 1
+        assert "error" in result["results"][1]
+
     def test_add_edge_valid(self, builder):
         builder.add_node("subject", "User", "u1")
         builder.add_node("resource", "Project", "p1")
         result = builder.add_edge("subject", "u1", "owns", "resource", "p1")
         assert result["relation"] == "owns"
         assert result["stores"]["registry"] == "ok"
+
+    def test_add_edges_batch_reports_partial_failures(self, builder):
+        builder.add_node("subject", "User", "u1")
+        builder.add_node("resource", "Project", "p1")
+
+        result = builder.add_edges(
+            [
+                {
+                    "from_space": "subject",
+                    "from_id": "u1",
+                    "relation": "owns",
+                    "to_space": "resource",
+                    "to_id": "p1",
+                },
+                {
+                    "from_space": "subject",
+                    "from_id": "u1",
+                    "relation": "mentions",
+                    "to_space": "resource",
+                    "to_id": "p1",
+                },
+            ]
+        )
+
+        assert result["requested"] == 2
+        assert result["added"] == 1
+        assert result["failed"] == 1
+        assert "error" in result["results"][1]
+
+    def test_add_edge_missing_nodes_skips_registry_and_logs_failure(self, builder):
+        result = builder.add_edge("subject", "u1", "owns", "resource", "p1")
+
+        assert result["stores"]["graph"] == "no match"
+        assert result["stores"]["registry"] == "skipped (graph edge not persisted)"
+        assert result["stores"]["documents"] == "failure_audited"
+
+        counts = builder._sql.table_counts()
+        assert counts["ontology_edges"] == 0
+
+        events = builder._mongo.get_audit_log()
+        assert len(events) == 1
+        assert events[0]["event_type"] == "edge_upsert_failed"
+        assert events[0]["details"]["graph_status"] == "no match"
 
     def test_add_edge_invalid_relation(self, builder):
         with pytest.raises(ValueError):

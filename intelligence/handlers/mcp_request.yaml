@@ -1,7 +1,10 @@
 metadata:
   status: Active
   source_of_truth: false
-  last_updated: 2026-03-26
+  last_updated: 2026-03-27
+  notes:
+    - "`mcp.ontology_query` now assembles a derived agent context bundle through AgentContextPipeline before returning the MCP payload."
+    - "`mcp.ontology_bulk_add_nodes` and `mcp.ontology_bulk_add_edges` extend the preserved OpenCrab tool surface with batch-safe local writes."
 
 emitted_by:
   - cli.serve
@@ -9,7 +12,9 @@ emitted_by:
 chain:
   - action: mcp.ontology_manifest
   - action: mcp.ontology_add_node
+  - action: mcp.ontology_bulk_add_nodes
   - action: mcp.ontology_add_edge
+  - action: mcp.ontology_bulk_add_edges
   - action: mcp.ontology_query
   - action: mcp.ontology_impact
   - action: mcp.ontology_rebac_check

@@ -229,6 +229,25 @@ class TestDuckDBStoreUnit:
         assert counts["audit_log"] == 1
         assert counts["ontology_nodes"] == 1
         assert counts["rebac_policies"] == 1
+        assert counts["staged_operations"] == 0
+
+    def test_staged_operations_lifecycle(self, store):
+        stage_id = store.stage_node("resource", "Document", "doc-1", {"name": "Draft"})
+
+        staged = store.get_staged_operation(stage_id)
+        assert staged is not None
+        assert staged["entry_type"] == "node"
+        assert staged["status"] == "draft"
+
+        store.mark_staged_published(stage_id, {"stores": {"graph": "ok"}})
+        published = store.get_staged_operation(stage_id)
+        assert published is not None
+        assert published["status"] == "published"
+        assert published["publish_result"]["stores"]["graph"] == "ok"
+
+        listed = store.list_staged_operations(status="published")
+        assert listed[0]["stage_id"] == stage_id
+        assert store.table_counts()["staged_operations"] == 1
 
     def test_second_process_can_open_same_db_file(self, tmp_path):
         from opencrab.stores.duckdb_store import DuckDBStore
@@ -292,6 +311,46 @@ class TestLocalFactory:
 
         assert first is second
         assert first.available is True
+
+    def test_factory_reuses_embedded_vector_store(self, tmp_path):
+        from opencrab.config import Settings
+        from opencrab.stores.factory import make_vector_store
+
+        settings = Settings(
+            STORAGE_MODE="local",
+            LOCAL_DATA_DIR=str(tmp_path),
+            CHROMA_COLLECTION="factory_vector_cache",
+        )
+
+        first = make_vector_store(settings)
+        second = make_vector_store(settings)
+
+        assert first is second
+        assert first.location == str(tmp_path / "chroma")
+
+    def test_factory_does_not_cache_unavailable_duckdb_store(self, monkeypatch, tmp_path):
+        from opencrab.config import Settings
+        from opencrab.stores import duckdb_store as duckdb_module
+        from opencrab.stores.factory import make_doc_store, reset_store_caches
+
+        init_count = 0
+
+        class FailingDuckDBStore:
+            def __init__(self, path):
+                nonlocal init_count
+                init_count += 1
+                self.path = path
+                self.available = False
+
+        settings = Settings(STORAGE_MODE="local", LOCAL_DATA_DIR=str(tmp_path))
+        reset_store_caches()
+        monkeypatch.setattr(duckdb_module, "DuckDBStore", FailingDuckDBStore)
+
+        first = make_doc_store(settings)
+        second = make_doc_store(settings)
+
+        assert first is not second
+        assert init_count == 2
 
 
 class TestLocalRuntime:

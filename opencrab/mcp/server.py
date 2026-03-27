@@ -49,6 +49,12 @@ class MCPServer:
         cfg = get_settings()
         self._name = cfg.mcp_server_name
         self._version = cfg.mcp_server_version
+        self._supported_protocol_versions = (
+            "2025-11-25",
+            "2025-03-26",
+            "2024-11-05",
+        )
+        self._initialized = False
 
     # ------------------------------------------------------------------
     # Entry point
@@ -77,16 +83,35 @@ class MCPServer:
     # Request handling
     # ------------------------------------------------------------------
 
-    def _handle_raw(self, raw: str) -> dict[str, Any] | None:
-        """Parse a raw JSON line and return a JSON-RPC response dict."""
+    def _handle_raw(self, raw: str) -> dict[str, Any] | list[dict[str, Any]] | None:
+        """Parse a raw JSON line and return a JSON-RPC response dict or batch."""
         if not raw or not raw.strip():
             return None
 
         try:
-            request = json.loads(raw)
+            request = json.loads(raw.lstrip("\ufeff"))
         except json.JSONDecodeError as exc:
             return self._error_response(None, PARSE_ERROR, f"Parse error: {exc}")
 
+        if isinstance(request, list):
+            if not request:
+                return self._error_response(None, INVALID_REQUEST, "Batch request must not be empty.")
+
+            responses: list[dict[str, Any]] = []
+            for item in request:
+                response = self._handle_message(item)
+                if response is not None:
+                    responses.append(response)
+            return responses or None
+
+        return self._handle_message(request)
+
+    def _handle_message(self, request: Any) -> dict[str, Any] | None:
+        """Process a single JSON-RPC request or notification."""
+        if not isinstance(request, dict):
+            return self._error_response(None, INVALID_REQUEST, "Request must be a JSON object.")
+
+        has_id = "id" in request
         req_id = request.get("id")
         method = request.get("method")
 
@@ -94,6 +119,13 @@ class MCPServer:
             return self._error_response(req_id, INVALID_REQUEST, "Missing or invalid 'method'.")
 
         params = request.get("params") or {}
+
+        if method.startswith("notifications/") and (not has_id or req_id is None):
+            try:
+                self._dispatch(method, params)
+            except Exception as exc:
+                logger.warning("Ignoring notification '%s' after error: %s", method, exc)
+            return None
 
         try:
             result = self._dispatch(method, params)
@@ -111,10 +143,17 @@ class MCPServer:
         """Route a method to its handler."""
         if method == "initialize":
             return self._handle_initialize(params)
+        elif method == "notifications/initialized":
+            self._initialized = True
+            return None
         elif method == "tools/list":
             return self._handle_tools_list(params)
         elif method == "tools/call":
             return self._handle_tools_call(params)
+        elif method == "resources/list":
+            return self._handle_resources_list(params)
+        elif method == "resources/templates/list":
+            return self._handle_resource_templates_list(params)
         elif method == "ping":
             return {"status": "ok", "server": self._name}
         else:
@@ -130,9 +169,16 @@ class MCPServer:
 
         Returns server capabilities and protocol version.
         """
+        requested_version = params.get("protocolVersion")
+        protocol_version = (
+            requested_version
+            if requested_version in self._supported_protocol_versions
+            else self._supported_protocol_versions[0]
+        )
         return {
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": protocol_version,
             "capabilities": {
+                "resources": {},
                 "tools": {"listChanged": False},
             },
             "serverInfo": {
@@ -149,6 +195,14 @@ class MCPServer:
     def _handle_tools_list(self, params: dict[str, Any]) -> dict[str, Any]:
         """Return the list of all available MCP tools."""
         return {"tools": TOOLS}
+
+    def _handle_resources_list(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Return the resources exposed by the server."""
+        return {"resources": []}
+
+    def _handle_resource_templates_list(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Return the parameterized resource templates exposed by the server."""
+        return {"resourceTemplates": []}
 
     def _handle_tools_call(self, params: dict[str, Any]) -> dict[str, Any]:
         """

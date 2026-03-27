@@ -1,7 +1,7 @@
 ---
 status: Active
 source_of_truth: No
-last_updated: 2026-03-26
+last_updated: 2026-03-27
 superseded_by: N/A
 ---
 
@@ -17,9 +17,10 @@ These examples assume `python` resolves to Python 3.11 or newer.
 python -m pip install -e ".[dev]"
 littlecrab init
 littlecrab status
+littlecrab doctor
 ```
 
-This creates `.env` and a local runtime directory such as `opencrab_data/`.
+This creates `.env` and a local runtime directory such as `opencrab_data/`. `doctor` adds an isolated write -> ingest -> query closure smoke on top of the basic store health check.
 
 ## 2. Connect From Codex
 
@@ -115,7 +116,20 @@ Use this pattern:
 3. Ask it to `ontology_extract` if you want bootstrap structure.
 4. Ask it to `ontology_query` or analysis tools to answer your actual question.
 
-## 6. Good Requests
+## 6. Draft-Before-Publish Writes
+
+If you want to queue ontology writes before promoting them into canonical truth:
+
+```bash
+littlecrab stage-node resource Document draft-doc --property name="Draft Doc"
+littlecrab stage-edge subject alice owns resource draft-doc
+littlecrab list-staged
+littlecrab publish-stage <stage-id>
+```
+
+Use this when you want an explicit review point. Staged operations live in DuckDB workflow state and do not become canonical ontology truth until publish succeeds.
+
+## 7. Good Requests
 
 Bootstrap requests:
 
@@ -139,7 +153,7 @@ Refinement requests:
 - `이 문서에서 빠진 노드가 있으면 ontology_add_node와 ontology_add_edge로 보강해줘.`
 - `새 문서가 기존 claim을 강화하는지, 반박하는지 설명하고 필요한 graph 보강을 제안해줘.`
 
-## 7. Recommended Agent Prompt Pattern
+## 8. Recommended Agent Prompt Pattern
 
 ```text
 1. ontology_manifest로 문법을 먼저 확인해.
@@ -150,7 +164,7 @@ Refinement requests:
 6. 무엇을 추가했고 무엇이 아직 불확실한지 구분해서 말해.
 ```
 
-## 8. When To Use Which Tool
+## 9. When To Use Which Tool
 
 - `ontology_manifest`
   - 문법 확인
@@ -165,8 +179,12 @@ Refinement requests:
   - 의미 검색 + graph anchor 조회
 - `ontology_add_node`
   - 명시적으로 노드를 추가할 때
+- `ontology_bulk_add_nodes`
+  - 한 번에 여러 노드를 추가할 때
 - `ontology_add_edge`
   - 명시적으로 relation을 추가할 때
+- `ontology_bulk_add_edges`
+  - 한 번에 여러 relation을 추가할 때
 - `ontology_rebac_check`
   - 접근 권한 판단
 - `ontology_impact`
@@ -174,7 +192,7 @@ Refinement requests:
 - `ontology_lever_simulate`
   - 레버 조정에 대한 outcome 예측
 
-## 9. Practical Notes
+## 10. Practical Notes
 
 - The canonical CLI command is `littlecrab`.
 - `little-crab` and `opencrab` remain available only as compatibility aliases.
@@ -182,13 +200,15 @@ Refinement requests:
 - Docker, Neo4j, MongoDB, PostgreSQL 운영 경로는 현재 범위가 아닙니다.
 - 현재 extractor는 heuristic 중심이라, `model` 문자열이 보여도 외부 LLM extractor가 기본으로 도는 구조는 아닙니다.
 - retrieval 품질은 문서 품질과 metadata 정리에 크게 좌우됩니다.
+- staged writes는 workflow 초안이지 canonical truth가 아닙니다.
 
-## 10. First Session Checklist
+## 11. First Session Checklist
 
 1. `littlecrab status`
-2. MCP 연결 확인
-3. `ontology_manifest`
-4. `knowledge/inbox/` 문서 ingest
-5. 필요한 문서 extract
-6. 첫 query
-7. 필요한 경우 node/edge 보강
+2. `littlecrab doctor`
+3. MCP 연결 확인
+4. `ontology_manifest`
+5. `knowledge/inbox/` 문서 ingest
+6. 필요한 문서 extract
+7. 첫 query
+8. 필요한 경우 node/edge 보강
