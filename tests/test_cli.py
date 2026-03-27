@@ -162,3 +162,51 @@ def test_stage_node_and_publish_stage_flow(tmp_path) -> None:
     assert published["status"] == "published"
     assert published["publish_result"]["stores"]["graph"] == "ok"
     assert published["publish_result"]["stores"]["registry"] == "ok"
+
+
+def test_publish_stage_duplicate_conflict_returns_failed_stage_json(tmp_path) -> None:
+    from opencrab.cli import main
+
+    _reset_runtime()
+    data_dir = tmp_path / "opencrab_data"
+    env = {
+        "STORAGE_MODE": "local",
+        "LOCAL_DATA_DIR": str(data_dir),
+        "CHROMA_COLLECTION": "test_stage_publish_conflict",
+    }
+
+    runner = CliRunner()
+    first_stage = runner.invoke(
+        main,
+        ["stage-node", "subject", "User", "shared-id", "--json-output"],
+        env=env,
+    )
+    assert first_stage.exit_code == 0
+    first_stage_id = json.loads(first_stage.output)["stage_id"]
+
+    first_publish = runner.invoke(
+        main,
+        ["publish-stage", first_stage_id, "--json-output"],
+        env=env,
+    )
+    assert first_publish.exit_code == 0
+    assert json.loads(first_publish.output)["status"] == "published"
+
+    conflict_stage = runner.invoke(
+        main,
+        ["stage-node", "resource", "Document", "shared-id", "--json-output"],
+        env=env,
+    )
+    assert conflict_stage.exit_code == 0
+    conflict_stage_id = json.loads(conflict_stage.output)["stage_id"]
+
+    conflict_publish = runner.invoke(
+        main,
+        ["publish-stage", conflict_stage_id, "--json-output"],
+        env=env,
+    )
+    assert conflict_publish.exit_code == 0
+    failed = json.loads(conflict_publish.output)
+    assert failed["stage_id"] == conflict_stage_id
+    assert failed["status"] == "failed"
+    assert "globally unique" in failed["publish_result"]["error"]
