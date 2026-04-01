@@ -5,8 +5,13 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+.coverage
+coverage.xml
+build/
+dist/
 .env
 opencrab_data/
 opencrab_data_*/
 little_crab_smoke/
 .codex/
+results.tsv

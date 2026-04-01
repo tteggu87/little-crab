@@ -15,15 +15,15 @@ This layered shape exists to preserve OpenCrab's useful behavior while simplifyi
 
 ### Surface Layer
 
-- CLI commands in [opencrab/cli.py](/C:/python_Github/playground/little-crab/opencrab/cli.py)
-- MCP JSON-RPC server in [opencrab/mcp/server.py](/C:/python_Github/playground/little-crab/opencrab/mcp/server.py)
+- CLI commands in [opencrab/cli.py](../opencrab/cli.py)
+- MCP JSON-RPC server in [opencrab/mcp/server.py](../opencrab/mcp/server.py)
 - Current CLI surface includes runtime health inspection and staged publish helpers in addition to the preserved OpenCrab-style read/write commands.
 
 ### Contract Layer
 
 - Grammar manifest
 - Grammar validator
-- Store contracts in [opencrab/stores/contracts.py](/C:/python_Github/playground/little-crab/opencrab/stores/contracts.py)
+- Store contracts in [opencrab/stores/contracts.py](../opencrab/stores/contracts.py)
 - This is the layer that preserves OpenCrab's ontology discipline and prevents the fork from becoming a generic graph toy.
 
 ### Runtime Layer
@@ -39,7 +39,7 @@ This layered shape exists to preserve OpenCrab's useful behavior while simplifyi
 ### Agent Context Layer
 
 - Derived read-only context bundle assembly for agent-facing reasoning
-- Current implementation entrypoint: [opencrab/ontology/context_pipeline.py](/C:/python_Github/playground/little-crab/opencrab/ontology/context_pipeline.py)
+- Current implementation entrypoint: [opencrab/ontology/context_pipeline.py](../opencrab/ontology/context_pipeline.py)
 - This layer gives agents one stable reasoning ingress even though canonical truth remains distributed across the live local stores.
 - Current bundle outputs distinguish confirmed vs inferred facts and surface evidence, provenance paths, missing links, and uncertainty notes.
 
@@ -51,8 +51,8 @@ This layered shape exists to preserve OpenCrab's useful behavior while simplifyi
 
 ### Documentation + Intelligence Layer
 
-- current docs under [docs](/C:/python_Github/playground/little-crab/docs)
-- lightweight repository intelligence under [intelligence](/C:/python_Github/playground/little-crab/intelligence)
+- current docs under [docs](.)
+- lightweight repository intelligence under [intelligence](../intelligence)
 
 ## Boundary Rules
 

@@ -13,7 +13,7 @@ The goal is not to replace tests. The goal is to preserve a concrete protocol-le
 
 ## Canonical Artifact Path
 
-- [docs/evidence/agent_sessions/2026-03-26-canonical](/C:/python_Github/playground/little-crab/docs/evidence/agent_sessions/2026-03-26-canonical)
+- [docs/evidence/agent_sessions/2026-03-26-canonical](evidence/agent_sessions/2026-03-26-canonical)
 
 ## Refresh Command
 
