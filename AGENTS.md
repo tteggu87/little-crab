@@ -11,10 +11,10 @@ little-crab is the local-first fork of OpenCrab. Treat the project's main identi
 
 ## Repository Rules
 
-- Canonical package entrypoints live in [pyproject.toml](/C:/python_Github/playground/little-crab/pyproject.toml).
-- Canonical CLI implementation lives in [opencrab/cli.py](/C:/python_Github/playground/little-crab/opencrab/cli.py).
-- Canonical MCP server lives in [opencrab/mcp/server.py](/C:/python_Github/playground/little-crab/opencrab/mcp/server.py).
-- Canonical grammar lives in [opencrab/grammar/manifest.py](/C:/python_Github/playground/little-crab/opencrab/grammar/manifest.py) and [opencrab/grammar/validator.py](/C:/python_Github/playground/little-crab/opencrab/grammar/validator.py).
+- Canonical package entrypoints live in [pyproject.toml](pyproject.toml).
+- Canonical CLI implementation lives in [opencrab/cli.py](opencrab/cli.py).
+- Canonical MCP server lives in [opencrab/mcp/server.py](opencrab/mcp/server.py).
+- Canonical grammar lives in [opencrab/grammar/manifest.py](opencrab/grammar/manifest.py) and [opencrab/grammar/validator.py](opencrab/grammar/validator.py).
 - Canonical local runtime is `LadybugDB + DuckDB + embedded ChromaDB`.
 - Do not reintroduce Neo4j, MongoDB, PostgreSQL, or Docker-first paths without an explicit architecture decision.
 - The Python module namespace remains `opencrab` for compatibility even though the package/project name is `little-crab`.
@@ -22,14 +22,14 @@ little-crab is the local-first fork of OpenCrab. Treat the project's main identi
 ## Documentation Rules
 
 - Keep these as current canonical docs:
-  - [docs/README.md](/C:/python_Github/playground/little-crab/docs/README.md)
-  - [docs/CURRENT_STATE.md](/C:/python_Github/playground/little-crab/docs/CURRENT_STATE.md)
-  - [docs/ARCHITECTURE.md](/C:/python_Github/playground/little-crab/docs/ARCHITECTURE.md)
-  - [docs/LAYERS.md](/C:/python_Github/playground/little-crab/docs/LAYERS.md)
-  - [docs/SKILLS_INTEGRATION.md](/C:/python_Github/playground/little-crab/docs/SKILLS_INTEGRATION.md)
-  - [docs/ROADMAP.md](/C:/python_Github/playground/little-crab/docs/ROADMAP.md)
-  - [docs/IMPACT_SUMMARY.md](/C:/python_Github/playground/little-crab/docs/IMPACT_SUMMARY.md)
-- Keep lightweight repository intelligence current under [intelligence](/C:/python_Github/playground/little-crab/intelligence).
+  - [docs/README.md](docs/README.md)
+  - [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md)
+  - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+  - [docs/LAYERS.md](docs/LAYERS.md)
+  - [docs/SKILLS_INTEGRATION.md](docs/SKILLS_INTEGRATION.md)
+  - [docs/ROADMAP.md](docs/ROADMAP.md)
+  - [docs/IMPACT_SUMMARY.md](docs/IMPACT_SUMMARY.md)
+- Keep lightweight repository intelligence current under [intelligence](intelligence).
 - Do not silently repurpose design notes as source of truth.
 - Existing design notes in `docs/*.md` with dated filenames are supporting context unless a canonical doc says otherwise.
 

@@ -21,18 +21,18 @@ That preserved flexibility is now an explicit project goal, not an implied one. 
 
 ## Canonical Docs
 
-- [CURRENT_STATE.md](/C:/python_Github/playground/little-crab/docs/CURRENT_STATE.md)
-- [ARCHITECTURE.md](/C:/python_Github/playground/little-crab/docs/ARCHITECTURE.md)
-- [LAYERS.md](/C:/python_Github/playground/little-crab/docs/LAYERS.md)
-- [SKILLS_INTEGRATION.md](/C:/python_Github/playground/little-crab/docs/SKILLS_INTEGRATION.md)
-- [MCP_DOGFOODING.md](/C:/python_Github/playground/little-crab/docs/MCP_DOGFOODING.md)
-- [ROADMAP.md](/C:/python_Github/playground/little-crab/docs/ROADMAP.md)
-- [IMPACT_SUMMARY.md](/C:/python_Github/playground/little-crab/docs/IMPACT_SUMMARY.md)
+- [CURRENT_STATE.md](CURRENT_STATE.md)
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [LAYERS.md](LAYERS.md)
+- [SKILLS_INTEGRATION.md](SKILLS_INTEGRATION.md)
+- [MCP_DOGFOODING.md](MCP_DOGFOODING.md)
+- [ROADMAP.md](ROADMAP.md)
+- [IMPACT_SUMMARY.md](IMPACT_SUMMARY.md)
 
 ## Design Notes
 
-- [2026-03-26-lancedb-evaluation.md](/C:/python_Github/playground/little-crab/docs/2026-03-26-lancedb-evaluation.md)
-- [2026-03-26-polaris-adaptation-for-little-crab.md](/C:/python_Github/playground/little-crab/docs/2026-03-26-polaris-adaptation-for-little-crab.md)
+- [2026-03-26-lancedb-evaluation.md](2026-03-26-lancedb-evaluation.md)
+- [2026-03-26-polaris-adaptation-for-little-crab.md](2026-03-26-polaris-adaptation-for-little-crab.md)
 
 ## Reviews
 
@@ -40,16 +40,16 @@ That preserved flexibility is now an explicit project goal, not an implied one. 
 
 ## Supporting Evidence
 
-- [AGENT_SESSION_EVIDENCE.md](/C:/python_Github/playground/little-crab/docs/AGENT_SESSION_EVIDENCE.md)
-- [USAGE_GUIDE.md](/C:/python_Github/playground/little-crab/docs/USAGE_GUIDE.md)
+- [AGENT_SESSION_EVIDENCE.md](AGENT_SESSION_EVIDENCE.md)
+- [USAGE_GUIDE.md](USAGE_GUIDE.md)
 
 ## Source Of Truth Map
 
-- Package metadata and script registration: [pyproject.toml](/C:/python_Github/playground/little-crab/pyproject.toml)
-- CLI: [opencrab/cli.py](/C:/python_Github/playground/little-crab/opencrab/cli.py)
-- MCP server: [opencrab/mcp/server.py](/C:/python_Github/playground/little-crab/opencrab/mcp/server.py)
-- Grammar manifest: [opencrab/grammar/manifest.py](/C:/python_Github/playground/little-crab/opencrab/grammar/manifest.py)
-- Runtime store contracts: [opencrab/stores/contracts.py](/C:/python_Github/playground/little-crab/opencrab/stores/contracts.py)
+- Package metadata and script registration: [pyproject.toml](../pyproject.toml)
+- CLI: [opencrab/cli.py](../opencrab/cli.py)
+- MCP server: [opencrab/mcp/server.py](../opencrab/mcp/server.py)
+- Grammar manifest: [opencrab/grammar/manifest.py](../opencrab/grammar/manifest.py)
+- Runtime store contracts: [opencrab/stores/contracts.py](../opencrab/stores/contracts.py)
 
 ## Current Runtime
 

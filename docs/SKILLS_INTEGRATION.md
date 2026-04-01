@@ -9,7 +9,7 @@ superseded_by: N/A
 
 ## Current Integration Surface
 
-little-crab does not ship repo-local Codex skills. Its integration surface is the MCP toolset exposed by [opencrab/mcp/server.py](/C:/python_Github/playground/little-crab/opencrab/mcp/server.py) and [opencrab/mcp/tools.py](/C:/python_Github/playground/little-crab/opencrab/mcp/tools.py).
+little-crab does not ship repo-local Codex skills. Its integration surface is the MCP toolset exposed by [opencrab/mcp/server.py](../opencrab/mcp/server.py) and [opencrab/mcp/tools.py](../opencrab/mcp/tools.py).
 
 ## Practical Use
 
@@ -35,8 +35,8 @@ little-crab does not ship repo-local Codex skills. Its integration surface is th
 
 The canonical local dogfood guide for this MCP surface lives at:
 
-- [MCP_DOGFOODING.md](/C:/python_Github/playground/little-crab/docs/MCP_DOGFOODING.md)
-- [USAGE_GUIDE.md](/C:/python_Github/playground/little-crab/docs/USAGE_GUIDE.md)
+- [MCP_DOGFOODING.md](MCP_DOGFOODING.md)
+- [USAGE_GUIDE.md](USAGE_GUIDE.md)
 
 Use it to validate the real agent workflow:
 

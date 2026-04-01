@@ -97,7 +97,7 @@ Success conditions:
 
 The repeatable local harness lives at:
 
-- [scripts/dogfood_mcp.py](/C:/python_Github/playground/little-crab/scripts/dogfood_mcp.py)
+- [scripts/dogfood_mcp.py](../scripts/dogfood_mcp.py)
 
 By default the script creates a temporary `LOCAL_DATA_DIR`, runs all three scenarios, prints `PASS` or `FAIL`, and removes the temp directory unless `--keep-data-dir` is supplied.
 
@@ -107,11 +107,11 @@ If `--transcript-dir` is supplied, the script also writes sanitized JSON transcr
 
 Canonical evidence notes live at:
 
-- [AGENT_SESSION_EVIDENCE.md](/C:/python_Github/playground/little-crab/docs/AGENT_SESSION_EVIDENCE.md)
+- [AGENT_SESSION_EVIDENCE.md](AGENT_SESSION_EVIDENCE.md)
 
 Canonical session artifacts currently live under:
 
-- [docs/evidence/agent_sessions/2026-03-26-canonical](/C:/python_Github/playground/little-crab/docs/evidence/agent_sessions/2026-03-26-canonical)
+- [docs/evidence/agent_sessions/2026-03-26-canonical](evidence/agent_sessions/2026-03-26-canonical)
 
 ## Failure Signals
 

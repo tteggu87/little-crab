@@ -62,10 +62,10 @@ Do not do this:
 
 Relevant source:
 
-- `C:\python_Github\ontol-codex\kuzu2\zk_graph_deploy_with_agent_20260309_170133\apps\polaris-route\src\App.tsx`
-- `C:\python_Github\ontol-codex\kuzu2\zk_graph_deploy_with_agent_20260309_170133\apps\polaris-route\src\components\GraphCanvas.tsx`
-- `C:\python_Github\ontol-codex\kuzu2\zk_graph_deploy_with_agent_20260309_170133\src\ontology2\viz\api.py`
-- `C:\python_Github\ontol-codex\kuzu2\zk_graph_deploy_with_agent_20260309_170133\src\ontology2\viz\projection.py`
+- Polaris application shell
+- Polaris graph canvas component
+- Polaris read-only visualization API
+- Polaris graph projection layer
 
 ### In langent
 
@@ -76,9 +76,9 @@ Relevant source:
 
 Relevant source:
 
-- `C:\python_Github\Agent_skill\copy skill\langent\langent\visualizer\app.js`
-- `C:\python_Github\Agent_skill\copy skill\langent\langent\server\api.py`
-- `C:\python_Github\Agent_skill\copy skill\langent\langent\brain.py`
+- langent nebula-style visualizer
+- langent server API
+- langent orchestration layer
 
 ## Not in scope
 
@@ -243,9 +243,9 @@ Returns:
 
 Add:
 
-- `C:\python_Github\playground\OpenCrab\opencrab\viz\__init__.py`
-- `C:\python_Github\playground\OpenCrab\opencrab\viz\projection.py`
-- `C:\python_Github\playground\OpenCrab\opencrab\viz\api.py`
+- `opencrab/viz/__init__.py`
+- `opencrab/viz/projection.py`
+- `opencrab/viz/api.py`
 
 Responsibilities:
 
@@ -274,11 +274,11 @@ Recommended rule:
 
 Add:
 
-- `C:\python_Github\playground\OpenCrab\apps\polaris-little-crab\`
+- `apps/polaris-little-crab/`
 
 Copy/adapt from:
 
-- `C:\python_Github\ontol-codex\kuzu2\zk_graph_deploy_with_agent_20260309_170133\apps\polaris-route\`
+- Polaris upstream frontend shell
 
 Required frontend files:
 
@@ -403,7 +403,7 @@ Do not absorb:
 
 If phase 1 lands well, add:
 
-- `C:\python_Github\playground\OpenCrab\apps\nebula-little-crab\`
+- `apps/nebula-little-crab/`
   - or a `/nebula` route under the same frontend
 
 Backend additions:
@@ -428,8 +428,8 @@ UI behavior:
 
 Add:
 
-- `C:\python_Github\playground\OpenCrab\tests\test_viz_projection.py`
-- `C:\python_Github\playground\OpenCrab\tests\test_viz_api.py`
+- `tests/test_viz_projection.py`
+- `tests/test_viz_api.py`
 
 Test:
 
