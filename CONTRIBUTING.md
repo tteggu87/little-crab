@@ -23,13 +23,21 @@ littlecrab init
 Run the core verification commands:
 
 ```bash
-py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py
-py -3.12 scripts/verify_repo_intelligence.py
+python -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py
+python scripts/verify_repo_intelligence.py
 ```
 
 If you change the MCP workflow or user-facing docs, also run:
 
 ```bash
+python scripts/dogfood_mcp.py
+```
+
+If your Windows shell does not map `python` to Python 3.11+, use the launcher fallback instead:
+
+```bash
+py -3.12 -m pytest tests/test_cli.py tests/test_mcp.py tests/test_stores.py
+py -3.12 scripts/verify_repo_intelligence.py
 py -3.12 scripts/dogfood_mcp.py
 ```
 

@@ -28,3 +28,6 @@ jobs:
 
       - name: Run tests
         run: python -m pytest
+
+      - name: Verify repository intelligence
+        run: python scripts/verify_repo_intelligence.py
