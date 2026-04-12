@@ -1,7 +1,7 @@
 ---
 status: Active
 source_of_truth: Yes
-last_updated: 2026-03-27
+last_updated: 2026-04-12
 superseded_by: N/A
 ---
 
@@ -53,6 +53,7 @@ The same preservation goal also applies to future read models and visualization 
 ### Storage Layer
 
 - `LadybugStore` owns graph traversal and path expansion.
+- `LadybugStore` now reuses one request-scoped connection for neighbor/path traversal instead of reopening handles for each graph subquery inside a traversal.
 - `LadybugStore` is the canonical store for ontology entity and relation truth.
 - `DuckDBStore` owns:
   - node documents
@@ -65,6 +66,7 @@ The same preservation goal also applies to future read models and visualization 
   - lever simulations
   - staged write operations
 - `DuckDBStore` is the canonical store for documentary, provenance, registry, policy, audit, and impact truth.
+- `DuckDBStore` now exposes batch-oriented source, node-document, and policy lookups so higher-level read paths can avoid N+1 embedded queries.
 - `ChromaStore` owns text embeddings and similarity retrieval.
 - `ChromaStore` is a derived retrieval index only and must not be treated as canonical truth.
 
@@ -79,7 +81,9 @@ The same preservation goal also applies to future read models and visualization 
 - Scoped query filters such as `project` and `source_id_prefix` intentionally disable graph expansion so hybrid results do not escape the caller's requested scope.
 - Embedded runtime state can be reset explicitly for tests and host reloads so settings and store caches rebuild against the current local configuration.
 - Agent-context enrichment is best-effort; supporting evidence and policy hint lookup failures should degrade into uncertainty and gap markers instead of aborting the full read path.
+- Agent-context enrichment should prefer batch lookups over per-fact store calls when the underlying local store supports them.
 - Agent-facing context is derived, read-only output from `AgentContextPipeline`; it must not become a second canonical persistence layer.
+- CLI ingest should prefer batch vector/document writes and only fall back to per-file writes when the batch path fails.
 - `node_id` remains globally unique across spaces.
 - The runtime is local-only.
 - The package surface is `little-crab`, while the import namespace remains `opencrab`.

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import ast
 import base64
-from contextlib import contextmanager
 import json
 import logging
 import os
@@ -20,7 +19,8 @@ import re
 import threading
 import time
 from collections import deque
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, cast
 
 from opencrab.grammar.manifest import all_relations
 
@@ -161,7 +161,7 @@ class LadybugStore:
         return payload
 
     def get_node(self, node_type: str, node_id: str) -> dict[str, Any] | None:
-        rows = self._execute(
+        rows = self._execute_dict_rows(
             """
             MATCH (n:OntologyNode {id: $id})
             WHERE n.node_type = $node_type
@@ -249,7 +249,7 @@ class LadybugStore:
             return self._run_direct_access_query(cypher, params or {})
 
         translated = self._translate_runtime_cypher(cypher)
-        rows = self._execute(translated, params or {})
+        rows = self._execute_dict_rows(translated, params or {})
         return [self._postprocess_row(row) for row in rows]
 
     def find_neighbors(
@@ -266,25 +266,26 @@ class LadybugStore:
         queue: deque[tuple[str, int]] = deque([(node_id, 0)])
         results: list[dict[str, Any]] = []
 
-        while queue and len(results) < limit:
-            current_id, current_depth = queue.popleft()
-            if current_depth >= depth:
-                continue
-
-            for neighbor in self._adjacent_nodes(current_id, direction):
-                nid = str(neighbor["node_id"])
-                if nid in visited:
+        with self._connection() as conn:
+            while queue and len(results) < limit:
+                current_id, current_depth = queue.popleft()
+                if current_depth >= depth:
                     continue
-                visited.add(nid)
-                results.append(
-                    {
-                        "properties": self._properties_from_row(neighbor),
-                        "labels": [neighbor.get("node_type")],
-                    }
-                )
-                queue.append((nid, current_depth + 1))
-                if len(results) >= limit:
-                    break
+
+                for neighbor in self._adjacent_nodes(current_id, direction, conn=conn):
+                    nid = str(neighbor["node_id"])
+                    if nid in visited:
+                        continue
+                    visited.add(nid)
+                    results.append(
+                        {
+                            "properties": self._properties_from_row(neighbor),
+                            "labels": [neighbor.get("node_type")],
+                        }
+                    )
+                    queue.append((nid, current_depth + 1))
+                    if len(results) >= limit:
+                        break
 
         return results
 
@@ -297,23 +298,28 @@ class LadybugStore:
         visited: set[str] = {from_id}
         queue: deque[tuple[str, list[dict[str, Any]]]] = deque([(from_id, [])])
 
-        while queue:
-            current_id, path = queue.popleft()
-            if len(path) >= max_depth * 2:
-                continue
+        with self._connection() as conn:
+            while queue:
+                current_id, path = queue.popleft()
+                if len(path) >= max_depth * 2:
+                    continue
 
-            for neighbor in self._adjacent_nodes(current_id, direction="out"):
-                nid = str(neighbor["node_id"])
-                rel = str(neighbor["rel_type"])
-                node = self._properties_from_row(neighbor)
-                new_path = path + [{"node": node, "relation": rel}]
+                for neighbor in self._adjacent_nodes(
+                    current_id,
+                    direction="out",
+                    conn=conn,
+                ):
+                    nid = str(neighbor["node_id"])
+                    rel = str(neighbor["rel_type"])
+                    node = self._properties_from_row(neighbor)
+                    new_path = path + [{"node": node, "relation": rel}]
 
-                if nid == to_id:
-                    return new_path
+                    if nid == to_id:
+                        return new_path
 
-                if nid not in visited:
-                    visited.add(nid)
-                    queue.append((nid, new_path))
+                    if nid not in visited:
+                        visited.add(nid)
+                        queue.append((nid, new_path))
 
         return []
 
@@ -322,7 +328,7 @@ class LadybugStore:
             raise RuntimeError("LadybugStore is not available.")
 
         if node_type:
-            rows = self._execute(
+            rows = self._execute_dict_rows(
                 """
                 MATCH (n:OntologyNode)
                 WHERE n.node_type = $node_type
@@ -331,7 +337,9 @@ class LadybugStore:
                 {"node_type": node_type},
             )
         else:
-            rows = self._execute("MATCH (n:OntologyNode) RETURN COUNT(n) AS count")
+            rows = self._execute_dict_rows(
+                "MATCH (n:OntologyNode) RETURN COUNT(n) AS count"
+            )
         return int(rows[0]["count"]) if rows else 0
 
     # ------------------------------------------------------------------
@@ -344,7 +352,24 @@ class LadybugStore:
         params: dict[str, Any] | None = None,
         *,
         dict_rows: bool = True,
+        conn: Any | None = None,
     ) -> list[dict[str, Any]] | list[list[Any]]:
+        if conn is not None:
+            result = conn.execute(query, params or {})
+            try:
+                if hasattr(result, "rows_as_dict") and dict_rows:
+                    return result.rows_as_dict().get_all()
+                if hasattr(result, "get_all"):
+                    return result.get_all()
+                return list(result)
+            finally:
+                close = getattr(result, "close", None)
+                if callable(close):
+                    try:
+                        close()
+                    except Exception:
+                        pass
+
         with self._connection() as conn:
             result = conn.execute(query, params or {})
             try:
@@ -360,6 +385,18 @@ class LadybugStore:
                         close()
                     except Exception:
                         pass
+
+    def _execute_dict_rows(
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
+        *,
+        conn: Any | None = None,
+    ) -> list[dict[str, Any]]:
+        return cast(
+            list[dict[str, Any]],
+            self._execute(query, params=params, dict_rows=True, conn=conn),
+        )
 
     @contextmanager
     def _connection(self) -> Any:
@@ -415,11 +452,17 @@ class LadybugStore:
                 processed[key] = value
         return processed
 
-    def _adjacent_nodes(self, node_id: str, direction: str) -> list[dict[str, Any]]:
+    def _adjacent_nodes(
+        self,
+        node_id: str,
+        direction: str,
+        *,
+        conn: Any | None = None,
+    ) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         if direction in ("out", "both"):
             rows.extend(
-                self._execute(
+                self._execute_dict_rows(
                     """
                     MATCH (n:OntologyNode {id: $id})-[r]->(m)
                     RETURN label(r) AS rel_type,
@@ -432,11 +475,12 @@ class LadybugStore:
                            m.payload AS payload
                     """,
                     {"id": node_id},
+                    conn=conn,
                 )
             )
         if direction in ("in", "both"):
             rows.extend(
-                self._execute(
+                self._execute_dict_rows(
                     """
                     MATCH (m)-[r]->(n:OntologyNode {id: $id})
                     RETURN label(r) AS rel_type,
@@ -449,6 +493,7 @@ class LadybugStore:
                            m.payload AS payload
                     """,
                     {"id": node_id},
+                    conn=conn,
                 )
             )
         return rows
@@ -482,7 +527,7 @@ class LadybugStore:
     ) -> list[dict[str, Any]]:
         relation_match = re.search(r"-\[r:([A-Za-z0-9_|]+)\]->", cypher)
         allowed_relations = set((relation_match.group(1) if relation_match else "").split("|"))
-        rows = self._execute(
+        rows = self._execute_dict_rows(
             """
             MATCH (s:OntologyNode {id: $sid})-[r]->(res:OntologyNode {id: $rid})
             RETURN label(r) AS rel_type
@@ -500,7 +545,7 @@ class LadybugStore:
         membership_relations = set((membership_match.group(1) if membership_match else "").split("|"))
         resource_relations = set((resource_match.group(1) if resource_match else "").split("|"))
 
-        rows = self._execute(
+        rows = self._execute_dict_rows(
             """
             MATCH (s:OntologyNode {id: $sid})-[m]->(grp:OntologyNode)
             MATCH (grp:OntologyNode)-[r]->(res:OntologyNode {id: $rid})
@@ -533,7 +578,7 @@ class LadybugStore:
         return props
 
     def _get_existing_identity(self, node_id: str) -> dict[str, Any] | None:
-        rows = self._execute(
+        rows = self._execute_dict_rows(
             """
             MATCH (n:OntologyNode {id: $id})
             RETURN n.node_type AS node_type, n.space AS space

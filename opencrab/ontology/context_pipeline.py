@@ -7,6 +7,7 @@ context assembly while keeping canonical truth ownership in the existing stores.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -248,32 +249,21 @@ class AgentContextPipeline:
         missing_links: list[MissingLink],
     ) -> list[SupportingEvidence]:
         evidence: list[SupportingEvidence] = []
+        source_map = self._load_supporting_sources(
+            facts,
+            enrichment_notes,
+            missing_links,
+        )
+        node_doc_map = self._load_node_documents(
+            facts,
+            enrichment_notes,
+            missing_links,
+        )
 
         for fact in facts:
             source_id = str(fact.metadata.get("source_id") or "")
             if source_id:
-                stored_source = None
-                if self._documents is not None and self._documents.available:
-                    try:
-                        stored_source = self._documents.get_source(source_id)
-                    except Exception as exc:
-                        enrichment_notes.append(
-                            f"Supporting source lookup failed for {source_id}: {exc}"
-                        )
-                        missing_links.append(
-                            MissingLink(
-                                kind="supporting_evidence_unavailable",
-                                description=(
-                                    f"Supporting source lookup failed for {source_id}; "
-                                    "the context bundle used the retrieved fact text instead."
-                                ),
-                                suggested_next_step=(
-                                    "Retry after document store recovery or inspect the source "
-                                    "document directly."
-                                ),
-                                metadata={"ref": source_id, "error": str(exc)},
-                            )
-                        )
+                stored_source = source_map.get(source_id)
                 evidence.append(
                     SupportingEvidence(
                         ref=source_id,
@@ -297,35 +287,8 @@ class AgentContextPipeline:
             elif fact.node_id:
                 node_doc = None
                 space = str(fact.metadata.get("space") or "")
-                if (
-                    space
-                    and self._documents is not None
-                    and self._documents.available
-                ):
-                    try:
-                        node_doc = self._documents.get_node_doc(space, fact.node_id)
-                    except Exception as exc:
-                        enrichment_notes.append(
-                            f"Node document lookup failed for {space}/{fact.node_id}: {exc}"
-                        )
-                        missing_links.append(
-                            MissingLink(
-                                kind="supporting_evidence_unavailable",
-                                description=(
-                                    f"Node document lookup failed for {space}/{fact.node_id}; "
-                                    "the context bundle used the retrieved fact text instead."
-                                ),
-                                suggested_next_step=(
-                                    "Retry after document store recovery or inspect the ontology "
-                                    "node directly."
-                                ),
-                                metadata={
-                                    "ref": fact.node_id,
-                                    "space": space,
-                                    "error": str(exc),
-                                },
-                            )
-                        )
+                if space:
+                    node_doc = node_doc_map.get((space, fact.node_id))
                 evidence.append(
                     SupportingEvidence(
                         ref=fact.node_id,
@@ -374,7 +337,8 @@ class AgentContextPipeline:
     def _collect_inferred_links(self, facts: list[AgentFact]) -> list[InferredLink]:
         links: list[InferredLink] = []
         for fact in facts:
-            anchor_id = fact.graph_context.get("anchor_id") if fact.graph_context else None
+            graph_context = fact.graph_context or {}
+            anchor_id = graph_context.get("anchor_id")
             if fact.source == "graph" and anchor_id and fact.node_id:
                 links.append(
                     InferredLink(
@@ -382,7 +346,7 @@ class AgentContextPipeline:
                         relation="neighbor_of",
                         to_id=str(fact.node_id),
                         basis="graph_expansion",
-                        metadata={"labels": list(fact.graph_context.get("labels", []))},
+                        metadata={"labels": list(graph_context.get("labels", []))},
                     )
                 )
         return links
@@ -458,16 +422,167 @@ class AgentContextPipeline:
             return []
 
         hints: list[PolicyHint] = []
+        policy_map = self._load_policy_hints(
+            request,
+            facts,
+            enrichment_notes,
+            missing_links,
+        )
         for fact in facts:
             if fact.metadata.get("space") not in (None, "resource", ""):
                 continue
             resource_id = fact.node_id or str(fact.metadata.get("resource_id") or "")
             if not resource_id:
                 continue
+            stored = policy_map.get(resource_id)
+            if stored is None:
+                continue
+            hints.append(
+                PolicyHint(
+                    subject_id=request.subject_id,
+                    permission=request.permission,
+                    resource_id=resource_id,
+                    status="granted" if stored else "denied",
+                    reason="Explicit policy hint from operational store.",
+                )
+            )
+        return hints
+
+    def _load_supporting_sources(
+        self,
+        facts: list[AgentFact],
+        enrichment_notes: list[str],
+        missing_links: list[MissingLink],
+    ) -> dict[str, dict[str, Any]]:
+        source_ids = [
+            str(fact.metadata.get("source_id") or "")
+            for fact in facts
+            if str(fact.metadata.get("source_id") or "")
+        ]
+        if not source_ids or self._documents is None or not self._documents.available:
+            return {}
+        documents = self._documents
+        return self._load_batch_map(
+            keys=source_ids,
+            batch_loader=getattr(documents, "get_sources", None),
+            single_loader=documents.get_source,
+            failure_message=lambda source_id, exc: (
+                f"Supporting source lookup failed for {source_id}: {exc}"
+            ),
+            missing_link_factory=lambda source_id, exc: MissingLink(
+                kind="supporting_evidence_unavailable",
+                description=(
+                    f"Supporting source lookup failed for {source_id}; "
+                    "the context bundle used the retrieved fact text instead."
+                ),
+                suggested_next_step=(
+                    "Retry after document store recovery or inspect the source "
+                    "document directly."
+                ),
+                metadata={"ref": source_id, "error": str(exc)},
+            ),
+            enrichment_notes=enrichment_notes,
+            missing_links=missing_links,
+        )
+
+    def _load_node_documents(
+        self,
+        facts: list[AgentFact],
+        enrichment_notes: list[str],
+        missing_links: list[MissingLink],
+    ) -> dict[tuple[str, str], dict[str, Any]]:
+        node_refs = [
+            (str(fact.metadata.get("space") or ""), str(fact.node_id))
+            for fact in facts
+            if fact.node_id
+            and str(fact.metadata.get("space") or "")
+            and not str(fact.metadata.get("source_id") or "")
+        ]
+        if not node_refs or self._documents is None or not self._documents.available:
+            return {}
+        documents = self._documents
+        return self._load_batch_map(
+            keys=node_refs,
+            batch_loader=getattr(documents, "get_node_docs", None),
+            single_loader=lambda ref: documents.get_node_doc(ref[0], ref[1]),
+            failure_message=lambda ref, exc: (
+                f"Node document lookup failed for {ref[0]}/{ref[1]}: {exc}"
+            ),
+            missing_link_factory=lambda ref, exc: MissingLink(
+                kind="supporting_evidence_unavailable",
+                description=(
+                    f"Node document lookup failed for {ref[0]}/{ref[1]}; "
+                    "the context bundle used the retrieved fact text instead."
+                ),
+                suggested_next_step=(
+                    "Retry after document store recovery or inspect the ontology "
+                    "node directly."
+                ),
+                metadata={"ref": ref[1], "space": ref[0], "error": str(exc)},
+            ),
+            enrichment_notes=enrichment_notes,
+            missing_links=missing_links,
+        )
+
+    def _load_policy_hints(
+        self,
+        request: AgentContextRequest,
+        facts: list[AgentFact],
+        enrichment_notes: list[str],
+        missing_links: list[MissingLink],
+    ) -> dict[str, bool]:
+        resource_ids = [
+            fact.node_id or str(fact.metadata.get("resource_id") or "")
+            for fact in facts
+            if fact.metadata.get("space") in (None, "resource", "")
+            and (fact.node_id or str(fact.metadata.get("resource_id") or ""))
+        ]
+        if not resource_ids:
+            return {}
+
+        assert self._operational is not None
+        subject_id = request.subject_id
+        permission = request.permission
+        assert subject_id is not None
+        assert permission is not None
+
+        batch_loader = getattr(self._operational, "check_policies", None)
+        if callable(batch_loader):
+            try:
+                return dict(
+                    batch_loader(
+                        subject_id,
+                        permission,
+                        resource_ids,
+                    )
+                    or {}
+                )
+            except Exception as exc:
+                for resource_id in resource_ids:
+                    enrichment_notes.append(
+                        f"Policy hint lookup failed for {resource_id}: {exc}"
+                    )
+                    missing_links.append(
+                        MissingLink(
+                            kind="policy_hint_unavailable",
+                            description=(
+                                f"Policy hint lookup failed for {resource_id}; "
+                                "the context bundle omitted policy hints for this resource."
+                            ),
+                            suggested_next_step=(
+                                "Retry after operational store recovery or inspect policies directly."
+                            ),
+                            metadata={"resource_id": resource_id, "error": str(exc)},
+                        )
+                    )
+                return {}
+
+        policy_map: dict[str, bool] = {}
+        for resource_id in resource_ids:
             try:
                 stored = self._operational.check_policy(
-                    request.subject_id,
-                    request.permission,
+                    subject_id,
+                    permission,
                     resource_id,
                 )
             except Exception as exc:
@@ -488,18 +603,41 @@ class AgentContextPipeline:
                     )
                 )
                 continue
-            if stored is None:
+            if stored is not None:
+                policy_map[resource_id] = bool(stored)
+        return policy_map
+
+    def _load_batch_map(
+        self,
+        keys: list[Any],
+        batch_loader: Callable[[list[Any]], dict[Any, dict[str, Any]] | None] | None,
+        single_loader: Callable[[Any], dict[str, Any] | None],
+        failure_message: Callable[[Any, Exception], str],
+        missing_link_factory: Callable[[Any, Exception], MissingLink],
+        enrichment_notes: list[str],
+        missing_links: list[MissingLink],
+    ) -> dict[Any, dict[str, Any]]:
+        deduped_keys = list(dict.fromkeys(keys))
+        if callable(batch_loader):
+            try:
+                return dict(batch_loader(deduped_keys) or {})
+            except Exception as exc:
+                for key in deduped_keys:
+                    enrichment_notes.append(failure_message(key, exc))
+                    missing_links.append(missing_link_factory(key, exc))
+                return {}
+
+        results: dict[Any, dict[str, Any]] = {}
+        for key in deduped_keys:
+            try:
+                item = single_loader(key)
+            except Exception as exc:
+                enrichment_notes.append(failure_message(key, exc))
+                missing_links.append(missing_link_factory(key, exc))
                 continue
-            hints.append(
-                PolicyHint(
-                    subject_id=request.subject_id,
-                    permission=request.permission,
-                    resource_id=resource_id,
-                    status="granted" if stored else "denied",
-                    reason="Explicit policy hint from operational store.",
-                )
-            )
-        return hints
+            if item is not None:
+                results[key] = item
+        return results
 
     def _collect_raw_refs(self, facts: list[AgentFact]) -> list[RawRef]:
         refs: list[RawRef] = []

@@ -7,8 +7,6 @@ All tests mock the underlying stores so no live services are required.
 from __future__ import annotations
 
 import json
-from io import StringIO
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -371,11 +369,13 @@ class TestToolDispatch:
 
         monkeypatch.setenv("LOCAL_DATA_DIR", str(first_dir))
         monkeypatch.setenv("CHROMA_COLLECTION", "reset-test-a")
+        monkeypatch.setenv("CHROMA_EMBEDDING_PROVIDER", "onnx")
         reset_runtime_state()
         first_ctx = _get_context()
 
         monkeypatch.setenv("LOCAL_DATA_DIR", str(second_dir))
         monkeypatch.setenv("CHROMA_COLLECTION", "reset-test-b")
+        monkeypatch.setenv("CHROMA_EMBEDDING_PROVIDER", "onnx")
         reset_runtime_state()
         second_ctx = _get_context()
 
@@ -462,6 +462,8 @@ class TestToolDispatch:
         ]
         documents = MagicMock()
         documents.available = True
+        documents.get_sources = None
+        documents.get_node_docs = None
         documents.get_source.return_value = {
             "text": "This is the longer supporting source text for doc-1.",
             "metadata": {"project": "alpha"},
@@ -470,6 +472,7 @@ class TestToolDispatch:
             "properties": {"description": "Document node description"},
         }
         operational = MagicMock()
+        operational.check_policies = None
         operational.check_policy.return_value = True
 
         pipeline = AgentContextPipeline(hybrid, documents, operational)
@@ -489,6 +492,60 @@ class TestToolDispatch:
         assert payload["policies"][0]["status"] == "granted"
         assert payload["provenance_paths"][0]["relation"] == "source_supports_fact"
 
+    def test_agent_context_pipeline_prefers_batch_enrichment_apis(self):
+        from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
+        from opencrab.ontology.query import QueryResult
+
+        hybrid = MagicMock()
+        hybrid.query.return_value = [
+            QueryResult(
+                source="vector",
+                node_id="doc-1",
+                score=0.92,
+                text="Doc summary",
+                metadata={"source_id": "src-1", "space": "resource"},
+            ),
+            QueryResult(
+                source="graph",
+                node_id="node-2",
+                score=0.5,
+                text="Node summary",
+                metadata={"space": "concept"},
+            ),
+        ]
+        documents = MagicMock()
+        documents.available = True
+        documents.get_sources.return_value = {
+            "src-1": {
+                "text": "Batch supporting source text",
+                "metadata": {"project": "alpha"},
+            }
+        }
+        documents.get_node_docs.return_value = {
+            ("concept", "node-2"): {
+                "properties": {"description": "Batch node doc"},
+            }
+        }
+        operational = MagicMock()
+        operational.check_policies.return_value = {"doc-1": True}
+
+        pipeline = AgentContextPipeline(hybrid, documents, operational)
+        bundle = pipeline.build_context(
+            AgentContextRequest(
+                question="what can alice view",
+                subject_id="alice",
+                permission="view",
+            )
+        )
+
+        documents.get_sources.assert_called_once_with(["src-1"])
+        documents.get_node_docs.assert_called_once_with([("concept", "node-2")])
+        operational.check_policies.assert_called_once_with("alice", "view", ["doc-1"])
+        documents.get_source.assert_not_called()
+        documents.get_node_doc.assert_not_called()
+        operational.check_policy.assert_not_called()
+        assert bundle.supporting_evidence[0].text_excerpt.startswith("Batch supporting source")
+
     def test_agent_context_pipeline_degrades_when_enrichment_lookups_fail(self):
         from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
         from opencrab.ontology.query import QueryResult
@@ -505,8 +562,10 @@ class TestToolDispatch:
         ]
         documents = MagicMock()
         documents.available = True
+        documents.get_sources = None
         documents.get_source.side_effect = RuntimeError("doc store unavailable")
         operational = MagicMock()
+        operational.check_policies = None
         operational.check_policy.side_effect = RuntimeError("policy store unavailable")
 
         pipeline = AgentContextPipeline(hybrid, documents, operational)

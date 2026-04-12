@@ -246,6 +246,41 @@ class DuckDBStore:
             "updated_at": str(row[5]),
         }
 
+    def get_node_docs(
+        self, node_refs: list[tuple[str, str]]
+    ) -> dict[tuple[str, str], dict[str, Any]]:
+        if not self._available:
+            raise RuntimeError("DuckDB store is not available.")
+        if not node_refs:
+            return {}
+
+        refs = list(dict.fromkeys(node_refs))
+        placeholders = ", ".join(["(?, ?)"] * len(refs))
+        params = [value for ref in refs for value in ref]
+
+        with self._connection() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT d.space, d.node_type, d.node_id, d.properties_json, d.created_at, d.updated_at
+                FROM node_documents AS d
+                INNER JOIN (VALUES {placeholders}) AS refs(space, node_id)
+                    ON d.space = refs.space AND d.node_id = refs.node_id
+                """,
+                params,
+            ).fetchall()
+
+        return {
+            (str(row[0]), str(row[2])): {
+                "space": row[0],
+                "node_type": row[1],
+                "node_id": row[2],
+                "properties": self._json_load(row[3]),
+                "created_at": str(row[4]),
+                "updated_at": str(row[5]),
+            }
+            for row in rows
+        }
+
     def list_nodes(self, space: str | None = None) -> list[dict[str, Any]]:
         if not self._available:
             raise RuntimeError("DuckDB store is not available.")
@@ -313,6 +348,39 @@ class DuckDBStore:
             )
         return source_id
 
+    def upsert_sources(self, records: list[dict[str, Any]]) -> list[str]:
+        if not self._available:
+            raise RuntimeError("DuckDB store is not available.")
+        if not records:
+            return []
+
+        now = self._now()
+        rows = [
+            [
+                str(record["source_id"]),
+                str(record["text"]),
+                self._json_dump(dict(record.get("metadata") or {})),
+                now,
+                now,
+            ]
+            for record in records
+        ]
+
+        with self._connection() as conn:
+            conn.executemany(
+                """
+                INSERT INTO source_documents
+                    (source_id, text, metadata_json, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (source_id) DO UPDATE SET
+                    text = EXCLUDED.text,
+                    metadata_json = EXCLUDED.metadata_json,
+                    updated_at = EXCLUDED.updated_at
+                """,
+                rows,
+            )
+        return [str(record["source_id"]) for record in records]
+
     def get_source(self, source_id: str) -> dict[str, Any] | None:
         if not self._available:
             raise RuntimeError("DuckDB store is not available.")
@@ -334,6 +402,36 @@ class DuckDBStore:
             "metadata": self._json_load(row[2]),
             "created_at": str(row[3]),
             "updated_at": str(row[4]),
+        }
+
+    def get_sources(self, source_ids: list[str]) -> dict[str, dict[str, Any]]:
+        if not self._available:
+            raise RuntimeError("DuckDB store is not available.")
+        if not source_ids:
+            return {}
+
+        ids = list(dict.fromkeys(source_ids))
+        placeholders = ", ".join(["?"] * len(ids))
+
+        with self._connection() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT source_id, text, metadata_json, created_at, updated_at
+                FROM source_documents
+                WHERE source_id IN ({placeholders})
+                """,
+                ids,
+            ).fetchall()
+
+        return {
+            str(row[0]): {
+                "source_id": row[0],
+                "text": row[1],
+                "metadata": self._json_load(row[2]),
+                "created_at": str(row[3]),
+                "updated_at": str(row[4]),
+            }
+            for row in rows
         }
 
     def list_sources(self, limit: int = 100) -> list[dict[str, Any]]:
@@ -576,6 +674,33 @@ class DuckDBStore:
         if row is None:
             return None
         return bool(row[0])
+
+    def check_policies(
+        self,
+        subject_id: str,
+        permission: str,
+        resource_ids: list[str],
+    ) -> dict[str, bool]:
+        if not self._available:
+            raise RuntimeError("DuckDB store is not available.")
+        if not resource_ids:
+            return {}
+
+        ids = list(dict.fromkeys(resource_ids))
+        placeholders = ", ".join(["?"] * len(ids))
+        params = [subject_id, permission, *ids]
+
+        with self._connection() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT resource_id, granted
+                FROM rebac_policies
+                WHERE subject_id = ? AND permission = ? AND resource_id IN ({placeholders})
+                """,
+                params,
+            ).fetchall()
+
+        return {str(row[0]): bool(row[1]) for row in rows}
 
     def list_policies(self, subject_id: str) -> list[dict[str, Any]]:
         if not self._available:

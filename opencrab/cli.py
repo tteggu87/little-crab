@@ -95,6 +95,10 @@ def _write_default_env(path: Path) -> None:
 STORAGE_MODE=local
 LOCAL_DATA_DIR=./opencrab_data
 CHROMA_COLLECTION=little_crab_vectors
+CHROMA_EMBEDDING_PROVIDER=onnx
+OLLAMA_URL=http://localhost:11434
+OLLAMA_EMBEDDING_MODEL=qwen3-embedding:4b
+OLLAMA_TIMEOUT=60
 MCP_SERVER_NAME=little-crab
 MCP_SERVER_VERSION=0.1.0
 LOG_LEVEL=INFO
@@ -128,7 +132,6 @@ def status() -> None:
     """Check connectivity to the embedded local stores."""
     from opencrab.config import get_settings
     from opencrab.stores.factory import (
-        make_doc_store,
         make_graph_store,
         make_sql_store,
         make_vector_store,
@@ -248,18 +251,14 @@ def doctor(json_output: bool) -> None:
 def ingest(path: str, recursive: bool, extension: str) -> None:
     """Ingest files from PATH into the ontology vector store."""
     from opencrab.config import get_settings
-    from opencrab.ontology.query import HybridQuery
     from opencrab.stores.factory import (
         make_doc_store,
-        make_graph_store,
         make_vector_store,
     )
 
     cfg = get_settings()
-    chroma = make_vector_store(cfg)
-    graph = make_graph_store(cfg)
+    vector = make_vector_store(cfg)
     docs = make_doc_store(cfg)
-    hybrid = HybridQuery(chroma, graph)
 
     extensions = [e.strip() for e in extension.split(",") if e.strip()]
     root = Path(path)
@@ -277,24 +276,90 @@ def ingest(path: str, recursive: bool, extension: str) -> None:
 
     console.print(f"[cyan]Ingesting {len(files)} file(s)...[/cyan]")
 
-    ok_count = 0
+    records: list[dict[str, Any]] = []
     for file in files:
         try:
             text = file.read_text(encoding="utf-8", errors="ignore")
             if not text.strip():
                 continue
-            source_id = str(file.resolve())
-            meta = {"source_path": str(file), "extension": file.suffix}
-
-            hybrid.ingest(text=text, source_id=source_id, metadata=meta)
-
-            if docs.available:
-                docs.upsert_source(source_id, text, meta)
-
-            ok_count += 1
-            console.print(f"  [green]OK[/green] {file.name} ({len(text)} chars)")
+            records.append(
+                {
+                    "file": file,
+                    "text": text,
+                    "source_id": str(file.resolve()),
+                    "metadata": {"source_path": str(file), "extension": file.suffix},
+                }
+            )
         except Exception as exc:
             console.print(f"  [red]FAIL[/red] {file.name}: {exc}")
+
+    ok_count = 0
+    if records:
+        vector_ids = [record["source_id"] for record in records]
+        vector_texts = [record["text"] for record in records]
+        vector_metadatas = [
+            {**record["metadata"], "source_id": record["source_id"]}
+            for record in records
+        ]
+        try:
+            vector.upsert_texts(
+                texts=vector_texts,
+                metadatas=vector_metadatas,
+                ids=vector_ids,
+            )
+            if docs.available:
+                bulk_upsert = getattr(docs, "upsert_sources", None)
+                if callable(bulk_upsert):
+                    bulk_upsert(
+                        [
+                            {
+                                "source_id": source_id,
+                                "text": text,
+                                "metadata": record["metadata"],
+                            }
+                            for record, source_id, text in zip(
+                                records,
+                                vector_ids,
+                                vector_texts,
+                                strict=True,
+                            )
+                        ]
+                    )
+                else:
+                    for record in records:
+                        docs.upsert_source(
+                            record["source_id"],
+                            record["text"],
+                            record["metadata"],
+                        )
+
+            ok_count = len(records)
+            for record in records:
+                console.print(
+                    f"  [green]OK[/green] {record['file'].name} ({len(record['text'])} chars)"
+                )
+        except Exception:
+            for record in records:
+                try:
+                    source_id = record["source_id"]
+                    text = record["text"]
+                    vector.upsert_texts(
+                        texts=[text],
+                        metadatas=[{**record["metadata"], "source_id": source_id}],
+                        ids=[source_id],
+                    )
+                    if docs.available:
+                        docs.upsert_source(
+                            source_id,
+                            text,
+                            record["metadata"],
+                        )
+                    ok_count += 1
+                    console.print(
+                        f"  [green]OK[/green] {record['file'].name} ({len(record['text'])} chars)"
+                    )
+                except Exception as exc:
+                    console.print(f"  [red]FAIL[/red] {record['file'].name}: {exc}")
 
     console.print(f"\n[bold green]Ingested {ok_count}/{len(files)} files.[/bold green]")
 

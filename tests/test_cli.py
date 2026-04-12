@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import tomllib
+from pathlib import Path
+from unittest.mock import MagicMock
 
 from click.testing import CliRunner
 
@@ -31,11 +32,48 @@ def test_ingest_accepts_single_file_path(tmp_path):
             "STORAGE_MODE": "local",
             "LOCAL_DATA_DIR": str(data_dir),
             "CHROMA_COLLECTION": "test_single_file_ingest",
+            "CHROMA_EMBEDDING_PROVIDER": "onnx",
         },
     )
 
     assert result.exit_code == 0
     assert "Ingested 1/1 files." in result.output
+
+
+def test_ingest_batches_vector_and_document_writes(monkeypatch, tmp_path):
+    from opencrab.cli import main
+
+    _reset_runtime()
+    data_dir = tmp_path / "opencrab_data"
+    first = tmp_path / "one.md"
+    second = tmp_path / "two.md"
+    first.write_text("cache ttl reliability")
+    second.write_text("batched vector writes")
+
+    vector = MagicMock()
+    vector.available = True
+    docs = MagicMock()
+    docs.available = True
+
+    monkeypatch.setattr("opencrab.stores.factory.make_vector_store", lambda cfg: vector)
+    monkeypatch.setattr("opencrab.stores.factory.make_doc_store", lambda cfg: docs)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        ["ingest", str(tmp_path), "--recursive"],
+        env={
+            "STORAGE_MODE": "local",
+            "LOCAL_DATA_DIR": str(data_dir),
+            "CHROMA_COLLECTION": "test_batch_ingest",
+            "CHROMA_EMBEDDING_PROVIDER": "onnx",
+        },
+    )
+
+    assert result.exit_code == 0
+    vector.upsert_texts.assert_called_once()
+    docs.upsert_sources.assert_called_once()
+    assert "Ingested 2/2 files." in result.output
 
 
 def test_cli_entrypoint_aliases_are_declared() -> None:
@@ -79,6 +117,7 @@ def test_doctor_json_output_reports_health_and_closure_smoke(tmp_path) -> None:
             "STORAGE_MODE": "local",
             "LOCAL_DATA_DIR": str(data_dir),
             "CHROMA_COLLECTION": "test_doctor_runtime",
+            "CHROMA_EMBEDDING_PROVIDER": "onnx",
         },
     )
 
@@ -101,6 +140,7 @@ def test_query_json_output_includes_trustability_counts(tmp_path) -> None:
         "STORAGE_MODE": "local",
         "LOCAL_DATA_DIR": str(data_dir),
         "CHROMA_COLLECTION": "test_query_trustability",
+        "CHROMA_EMBEDDING_PROVIDER": "onnx",
     }
 
     runner = CliRunner()
@@ -127,6 +167,7 @@ def test_stage_node_and_publish_stage_flow(tmp_path) -> None:
         "STORAGE_MODE": "local",
         "LOCAL_DATA_DIR": str(data_dir),
         "CHROMA_COLLECTION": "test_stage_publish",
+        "CHROMA_EMBEDDING_PROVIDER": "onnx",
     }
 
     runner = CliRunner()
@@ -173,6 +214,7 @@ def test_publish_stage_duplicate_conflict_returns_failed_stage_json(tmp_path) ->
         "STORAGE_MODE": "local",
         "LOCAL_DATA_DIR": str(data_dir),
         "CHROMA_COLLECTION": "test_stage_publish_conflict",
+        "CHROMA_EMBEDDING_PROVIDER": "onnx",
     }
 
     runner = CliRunner()

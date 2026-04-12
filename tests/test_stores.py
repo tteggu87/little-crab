@@ -63,6 +63,30 @@ class TestLadybugStoreUnit:
         assert len(path) == 2
         assert path[-1]["node"]["id"] == "p1"
 
+    def test_neighbor_and_path_queries_reuse_one_connection_per_traversal(self, store):
+        store.upsert_node("User", "u1", {"name": "Alice"}, space_id="subject")
+        store.upsert_node("Team", "t1", {"name": "Data Team"}, space_id="subject")
+        store.upsert_node("Project", "p1", {"name": "Project"}, space_id="resource")
+        store.upsert_edge("User", "u1", "member_of", "Team", "t1")
+        store.upsert_edge("Team", "t1", "can_view", "Project", "p1")
+
+        original_open_handles = store._open_handles
+        open_count = 0
+
+        def counting_open_handles():
+            nonlocal open_count
+            open_count += 1
+            return original_open_handles()
+
+        store._open_handles = counting_open_handles
+
+        neighbors = store.find_neighbors("u1", direction="both", depth=2, limit=10)
+        path = store.find_path("u1", "p1", max_depth=3)
+
+        assert {n["properties"]["id"] for n in neighbors} >= {"t1", "p1"}
+        assert path[-1]["node"]["id"] == "p1"
+        assert open_count == 2
+
     def test_runtime_queries_for_rebac_and_lever_paths(self, store):
         store.upsert_node("User", "u1", {"name": "Alice"}, space_id="subject")
         store.upsert_node("Team", "t1", {"name": "Data Team"}, space_id="subject")
@@ -138,7 +162,11 @@ class TestChromaStoreUnit:
         from opencrab.stores.chroma_store import ChromaStore
         from opencrab.stores.factory import make_vector_store
 
-        settings = Settings(STORAGE_MODE="local", LOCAL_DATA_DIR=str(tmp_path))
+        settings = Settings(
+            STORAGE_MODE="local",
+            LOCAL_DATA_DIR=str(tmp_path),
+            CHROMA_EMBEDDING_PROVIDER="onnx",
+        )
         store = make_vector_store(settings)
 
         assert isinstance(store, ChromaStore)
@@ -199,6 +227,42 @@ class TestDuckDBStoreUnit:
         assert source is not None
         assert source["text"] == "hello world"
         assert source["metadata"]["space"] == "evidence"
+
+    def test_bulk_source_and_policy_lookups(self, store):
+        store.upsert_sources(
+            [
+                {
+                    "source_id": "src-1",
+                    "text": "hello world",
+                    "metadata": {"space": "evidence"},
+                },
+                {
+                    "source_id": "src-2",
+                    "text": "cache ttl",
+                    "metadata": {"space": "resource"},
+                },
+            ]
+        )
+        store.set_policy("u1", "view", "r1", granted=True)
+        store.set_policy("u1", "view", "r2", granted=False)
+
+        sources = store.get_sources(["src-1", "src-2", "missing"])
+        policies = store.check_policies("u1", "view", ["r1", "r2", "missing"])
+
+        assert set(sources) == {"src-1", "src-2"}
+        assert sources["src-2"]["text"] == "cache ttl"
+        assert policies == {"r1": True, "r2": False}
+
+    def test_bulk_node_doc_lookup(self, store):
+        store.upsert_node_doc("subject", "User", "u1", {"name": "Alice"})
+        store.upsert_node_doc("resource", "Document", "doc-1", {"name": "Spec"})
+
+        docs = store.get_node_docs(
+            [("subject", "u1"), ("resource", "doc-1"), ("subject", "missing")]
+        )
+
+        assert set(docs) == {("subject", "u1"), ("resource", "doc-1")}
+        assert docs[("resource", "doc-1")]["properties"]["name"] == "Spec"
 
     def test_register_policy_and_analysis_records(self, store):
         store.register_node("subject", "User", "u1")
@@ -280,7 +344,11 @@ class TestLocalFactory:
         from opencrab.stores.duckdb_store import DuckDBStore
         from opencrab.stores.factory import make_doc_store, make_sql_store
 
-        settings = Settings(STORAGE_MODE="local", LOCAL_DATA_DIR=str(tmp_path))
+        settings = Settings(
+            STORAGE_MODE="local",
+            LOCAL_DATA_DIR=str(tmp_path),
+            CHROMA_EMBEDDING_PROVIDER="onnx",
+        )
 
         docs = make_doc_store(settings)
         sql = make_sql_store(settings)
@@ -294,7 +362,11 @@ class TestLocalFactory:
         from opencrab.stores.factory import make_graph_store
         from opencrab.stores.ladybug_store import LadybugStore
 
-        settings = Settings(STORAGE_MODE="local", LOCAL_DATA_DIR=str(tmp_path))
+        settings = Settings(
+            STORAGE_MODE="local",
+            LOCAL_DATA_DIR=str(tmp_path),
+            CHROMA_EMBEDDING_PROVIDER="onnx",
+        )
         graph = make_graph_store(settings)
 
         assert isinstance(graph, LadybugStore)
@@ -304,7 +376,11 @@ class TestLocalFactory:
         from opencrab.config import Settings
         from opencrab.stores.factory import make_graph_store
 
-        settings = Settings(STORAGE_MODE="local", LOCAL_DATA_DIR=str(tmp_path))
+        settings = Settings(
+            STORAGE_MODE="local",
+            LOCAL_DATA_DIR=str(tmp_path),
+            CHROMA_EMBEDDING_PROVIDER="onnx",
+        )
 
         first = make_graph_store(settings)
         second = make_graph_store(settings)
@@ -320,6 +396,7 @@ class TestLocalFactory:
             STORAGE_MODE="local",
             LOCAL_DATA_DIR=str(tmp_path),
             CHROMA_COLLECTION="factory_vector_cache",
+            CHROMA_EMBEDDING_PROVIDER="onnx",
         )
 
         first = make_vector_store(settings)
@@ -342,7 +419,11 @@ class TestLocalFactory:
                 self.path = path
                 self.available = False
 
-        settings = Settings(STORAGE_MODE="local", LOCAL_DATA_DIR=str(tmp_path))
+        settings = Settings(
+            STORAGE_MODE="local",
+            LOCAL_DATA_DIR=str(tmp_path),
+            CHROMA_EMBEDDING_PROVIDER="onnx",
+        )
         reset_store_caches()
         monkeypatch.setattr(duckdb_module, "DuckDBStore", FailingDuckDBStore)
 
@@ -351,6 +432,27 @@ class TestLocalFactory:
 
         assert first is not second
         assert init_count == 2
+
+    def test_factory_applies_ollama_embedding_settings(self, tmp_path):
+        from opencrab.config import Settings
+        from opencrab.stores.factory import make_vector_store, reset_store_caches
+
+        settings = Settings(
+            STORAGE_MODE="local",
+            LOCAL_DATA_DIR=str(tmp_path),
+            CHROMA_COLLECTION="factory_vector_ollama",
+            CHROMA_EMBEDDING_PROVIDER="ollama",
+            OLLAMA_URL="http://localhost:11434",
+            OLLAMA_EMBEDDING_MODEL="qwen3-embedding:4b",
+            OLLAMA_TIMEOUT=30,
+        )
+
+        reset_store_caches()
+        store = make_vector_store(settings)
+
+        assert store.embedding_provider == "ollama"
+        assert store.embedding_model == "qwen3-embedding:4b"
+        assert store.embedding_url == "http://localhost:11434"
 
 
 class TestLocalRuntime:
