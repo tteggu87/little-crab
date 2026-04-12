@@ -15,7 +15,7 @@ Tools:
   7. ontology_impact            — impact analysis (I1–I7)
   8. ontology_rebac_check       — ReBAC access check
   9. ontology_lever_simulate    — predict outcome changes from lever movement
- 10. ontology_extract           — heuristic ontology extraction
+ 10. ontology_extract           — local-first extraction with optional LLM enrichment
  11. ontology_ingest            — ingest text into vector store
 """
 
@@ -43,36 +43,21 @@ def _get_context() -> dict[str, Any]:
         return _context
 
     from opencrab.config import get_settings
-    from opencrab.ontology.builder import OntologyBuilder
-    from opencrab.ontology.context_pipeline import AgentContextPipeline
-    from opencrab.ontology.impact import ImpactEngine
-    from opencrab.ontology.query import HybridQuery
-    from opencrab.ontology.rebac import ReBACEngine
-    from opencrab.stores.factory import make_doc_store, make_graph_store, make_sql_store, make_vector_store
+    from opencrab.stores.factory import make_runtime_services
 
     cfg = get_settings()
-
-    graph = make_graph_store(cfg)
-    vector = make_vector_store(cfg)
-    docs = make_doc_store(cfg)
-    sql = make_sql_store(cfg)
-
-    builder = OntologyBuilder(graph, docs, sql)
-    rebac = ReBACEngine(graph, sql)
-    impact = ImpactEngine(graph, sql)
-    hybrid = HybridQuery(vector, graph)
-    context_pipeline = AgentContextPipeline(hybrid, docs, sql)
+    services = make_runtime_services(cfg)
 
     _context = {
-        "graph": graph,
-        "vectors": vector,
-        "documents": docs,
-        "sql": sql,
-        "builder": builder,
-        "rebac": rebac,
-        "impact": impact,
-        "hybrid": hybrid,
-        "context_pipeline": context_pipeline,
+        "graph": services.stores.graph,
+        "vectors": services.stores.vector,
+        "documents": services.stores.documents,
+        "sql": services.stores.sql,
+        "builder": services.builder,
+        "rebac": services.rebac,
+        "impact": services.impact,
+        "hybrid": services.hybrid,
+        "context_pipeline": services.context_pipeline,
     }
     return _context
 
@@ -374,13 +359,14 @@ def ontology_lever_simulate(
 def ontology_extract(
     text: str,
     source_id: str,
-    model: str = "claude-haiku-4-5-20251001",
+    model: str = "heuristic",
 ) -> dict[str, Any]:
     """
     Extract ontology nodes and edges from text and write them to the graph.
 
-    little-crab currently uses a conservative local heuristic extractor that
-    keeps the MCP surface available without requiring an external LLM service.
+    little-crab uses a conservative local heuristic extractor by default and
+    can optionally enrich extraction with an Anthropic-backed LLM path when
+    configuration makes that available.
 
     Parameters
     ----------
@@ -389,7 +375,9 @@ def ontology_extract(
     source_id:
         Stable identifier for this source (e.g. file path or URL).
     model:
-        Claude model to use for extraction.
+        Extraction mode/model. Use ``heuristic`` for deterministic local
+        extraction or pass a Claude model name to opt into Anthropic-backed
+        enrichment.
     """
     from opencrab.ontology.extractor import LLMExtractor
 
@@ -433,6 +421,7 @@ def ontology_extract(
         return {
             "source_id": source_id,
             "extractor_mode": result.mode,
+            "requested_model": result.model,
             "extracted_nodes": len(result.nodes),
             "extracted_edges": len(result.edges),
             "added_nodes": added_nodes,
@@ -440,6 +429,18 @@ def ontology_extract(
             "extraction_errors": result.errors,
             "node_errors": node_errors,
             "edge_errors": edge_errors,
+            "diagnostics": {
+                "source_id": result.source_id,
+                "requested_model": result.model,
+                "extractor_mode": result.mode,
+                "llm_requested": result.llm_requested,
+                "llm_attempted": result.llm_attempted,
+                "heuristic_fallback_used": result.heuristic_fallback_used,
+                "chunk_count": result.chunk_count,
+                "extraction_error_count": len(result.errors),
+                "node_error_count": len(node_errors),
+                "edge_error_count": len(edge_errors),
+            },
         }
     except Exception as exc:
         logger.error("ontology_extract failed: %s", exc)
@@ -688,8 +689,9 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "ontology_extract": {
         "description": (
-            "Extract ontology nodes and edges from text with the local heuristic "
-            "extractor, then persist them into the knowledge graph."
+            "Extract ontology nodes and edges from text with the local-first "
+            "extractor, using heuristic fallback and optional LLM enrichment, "
+            "then persist them into the knowledge graph."
         ),
         "inputSchema": {
             "type": "object",
@@ -698,8 +700,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "source_id": {"type": "string", "description": "Stable source identifier."},
                 "model": {
                     "type": "string",
-                    "description": "Claude model (default: claude-haiku-4-5-20251001).",
-                    "default": "claude-haiku-4-5-20251001",
+                    "description": (
+                        "Extraction mode/model (default: heuristic). Pass a "
+                        "Claude model name to opt into Anthropic enrichment."
+                    ),
+                    "default": "heuristic",
                 },
             },
             "required": ["text", "source_id"],

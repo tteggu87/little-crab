@@ -132,20 +132,17 @@ def serve() -> None:
 def status() -> None:
     """Check connectivity to the embedded local stores."""
     from opencrab.config import get_settings
-    from opencrab.stores.factory import (
-        make_graph_store,
-        make_sql_store,
-        make_vector_store,
-    )
+    from opencrab.stores.factory import make_runtime_stores
 
     cfg = get_settings()
     mode_label = "[bold cyan]LOCAL MODE[/bold cyan]"
     storage_loc = cfg.local_data_dir
     console.print(f"\n{mode_label} - storage at: {storage_loc}\n")
 
-    graph = make_graph_store(cfg)
-    vector = make_vector_store(cfg)
-    sql = make_sql_store(cfg)
+    stores = make_runtime_stores(cfg)
+    graph = stores.graph
+    vector = stores.vector
+    sql = stores.sql
 
     store_rows: list[tuple[str, str, Any]] = [
         ("Graph (LadybugDB)", cfg.local_data_dir + "/graph.lbug", graph),
@@ -252,14 +249,12 @@ def doctor(json_output: bool) -> None:
 def ingest(path: str, recursive: bool, extension: str) -> None:
     """Ingest files from PATH into the ontology vector store."""
     from opencrab.config import get_settings
-    from opencrab.stores.factory import (
-        make_doc_store,
-        make_vector_store,
-    )
+    from opencrab.stores.factory import make_runtime_stores
 
     cfg = get_settings()
-    vector = make_vector_store(cfg)
-    docs = make_doc_store(cfg)
+    stores = make_runtime_stores(cfg)
+    vector = stores.vector
+    docs = stores.documents
 
     extensions = [e.strip() for e in extension.split(",") if e.strip()]
     root = Path(path)
@@ -395,21 +390,12 @@ def query(
 ) -> None:
     """Run a trustability-oriented hybrid query and print results."""
     from opencrab.config import get_settings
-    from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
-    from opencrab.ontology.query import HybridQuery
-    from opencrab.stores.factory import (
-        make_doc_store,
-        make_graph_store,
-        make_sql_store,
-        make_vector_store,
-    )
+    from opencrab.ontology.context_pipeline import AgentContextRequest
+    from opencrab.stores.factory import make_runtime_services
 
     cfg = get_settings()
-    chroma = make_vector_store(cfg)
-    graph = make_graph_store(cfg)
-    docs = make_doc_store(cfg)
-    sql = make_sql_store(cfg)
-    pipeline = AgentContextPipeline(HybridQuery(chroma, graph), docs, sql)
+    services = make_runtime_services(cfg)
+    pipeline = services.context_pipeline
 
     space_filter = [s.strip() for s in spaces.split(",")] if spaces else None
 
@@ -578,10 +564,10 @@ def stage_node(
 ) -> None:
     """Stage a node write without publishing it to canonical truth yet."""
     from opencrab.config import get_settings
-    from opencrab.stores.factory import make_sql_store
+    from opencrab.stores.factory import make_runtime_stores
 
     cfg = get_settings()
-    sql = make_sql_store(cfg)
+    sql = make_runtime_stores(cfg).sql
     payload = _parse_property_pairs(properties)
     stage_id = sql.stage_node(space, node_type, node_id, payload)
     result = {
@@ -627,10 +613,10 @@ def stage_edge(
 ) -> None:
     """Stage an edge write without publishing it to canonical truth yet."""
     from opencrab.config import get_settings
-    from opencrab.stores.factory import make_sql_store
+    from opencrab.stores.factory import make_runtime_stores
 
     cfg = get_settings()
-    sql = make_sql_store(cfg)
+    sql = make_runtime_stores(cfg).sql
     payload = _parse_property_pairs(properties)
     stage_id = sql.stage_edge(from_space, from_id, relation, to_space, to_id, payload)
     result = {
@@ -666,10 +652,10 @@ def stage_edge(
 def list_staged(status_filter: str | None, limit: int, json_output: bool) -> None:
     """List staged write operations."""
     from opencrab.config import get_settings
-    from opencrab.stores.factory import make_sql_store
+    from opencrab.stores.factory import make_runtime_stores
 
     cfg = get_settings()
-    sql = make_sql_store(cfg)
+    sql = make_runtime_stores(cfg).sql
     items = sql.list_staged_operations(status=status_filter, limit=limit)
 
     if json_output:
@@ -707,12 +693,13 @@ def publish_stage(stage_id: str, json_output: bool) -> None:
     """Publish one staged write into canonical truth."""
     from opencrab.config import get_settings
     from opencrab.ontology.builder import OntologyBuilder
-    from opencrab.stores.factory import make_doc_store, make_graph_store, make_sql_store
+    from opencrab.stores.factory import make_runtime_stores
 
     cfg = get_settings()
-    graph = make_graph_store(cfg)
-    docs = make_doc_store(cfg)
-    sql = make_sql_store(cfg)
+    stores = make_runtime_stores(cfg)
+    graph = stores.graph
+    docs = stores.documents
+    sql = stores.sql
     staged = sql.get_staged_operation(stage_id)
     if staged is None:
         raise click.ClickException(f"Unknown stage_id: {stage_id}")
@@ -848,17 +835,13 @@ def _format_staged_target(item: dict[str, Any]) -> str:
 
 
 def _build_doctor_report(cfg: Any) -> dict[str, Any]:
-    from opencrab.stores.factory import (
-        make_doc_store,
-        make_graph_store,
-        make_sql_store,
-        make_vector_store,
-    )
+    from opencrab.stores.factory import make_runtime_stores
 
-    graph = make_graph_store(cfg)
-    docs = make_doc_store(cfg)
-    sql = make_sql_store(cfg)
-    vector = make_vector_store(cfg)
+    runtime_stores = make_runtime_stores(cfg)
+    graph = runtime_stores.graph
+    docs = runtime_stores.documents
+    sql = runtime_stores.sql
+    vector = runtime_stores.vector
 
     stores: list[dict[str, Any]] = []
     degraded_reasons: list[str] = []
@@ -927,13 +910,7 @@ def _run_isolated_closure_smoke() -> dict[str, Any]:
     from opencrab.ontology.builder import OntologyBuilder
     from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
     from opencrab.ontology.query import HybridQuery
-    from opencrab.stores.factory import (
-        make_doc_store,
-        make_graph_store,
-        make_sql_store,
-        make_vector_store,
-        reset_store_caches,
-    )
+    from opencrab.stores.factory import make_runtime_stores, reset_store_caches
 
     temp_dir_obj = tempfile.TemporaryDirectory(
         prefix="little-crab-doctor-",
@@ -946,10 +923,11 @@ def _run_isolated_closure_smoke() -> dict[str, Any]:
             LOCAL_DATA_DIR=temp_dir,
             CHROMA_COLLECTION="doctor_smoke_vectors",
         )
-        graph = make_graph_store(smoke_cfg)
-        docs = make_doc_store(smoke_cfg)
-        sql = make_sql_store(smoke_cfg)
-        vector = make_vector_store(smoke_cfg)
+        stores = make_runtime_stores(smoke_cfg)
+        graph = stores.graph
+        docs = stores.documents
+        sql = stores.sql
+        vector = stores.vector
         builder = OntologyBuilder(graph, docs, sql)
         hybrid = HybridQuery(vector, graph)
         pipeline = AgentContextPipeline(hybrid, docs, sql)

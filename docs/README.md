@@ -1,7 +1,7 @@
 ---
 status: Active
 source_of_truth: Yes
-last_updated: 2026-03-27
+last_updated: 2026-04-13
 superseded_by: N/A
 ---
 
@@ -28,6 +28,9 @@ That preserved flexibility is now an explicit project goal, not an implied one. 
 - [MCP_DOGFOODING.md](MCP_DOGFOODING.md)
 - [ROADMAP.md](ROADMAP.md)
 - [IMPACT_SUMMARY.md](IMPACT_SUMMARY.md)
+- [UPSTREAM_TRAJECTORY.md](UPSTREAM_TRAJECTORY.md)
+- [FORK_BOUNDARY.md](FORK_BOUNDARY.md)
+- [PHASE3_ADOPTION_REVIEW.md](PHASE3_ADOPTION_REVIEW.md)
 
 ## Design Notes
 
@@ -75,6 +78,8 @@ Agent-facing read paths now also have a single derived context ingress through t
 The current CLI surface now also includes `littlecrab doctor` for runtime closure checks and a lightweight staged write workflow through `stage-node`, `stage-edge`, `list-staged`, and `publish-stage`.
 
 The current MCP surface now includes batch-safe write helpers `ontology_bulk_add_nodes` and `ontology_bulk_add_edges` in addition to the preserved single-write tools.
+
+The current local ingestion path also includes a staged KakaoTalk workflow: bootstrap chatroom resources, participants, sources, and evidence first, then run a second local heuristic pass to promote selected evidence into concept and claim nodes.
 
 ## Project Intent
 

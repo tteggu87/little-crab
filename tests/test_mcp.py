@@ -356,10 +356,113 @@ class TestToolDispatch:
             )
 
             assert result["extractor_mode"] == "heuristic"
+            assert result["requested_model"] == "heuristic"
             assert result["extracted_nodes"] >= 2
             assert result["extracted_edges"] >= 1
             assert result["added_nodes"] >= 2
             assert result["added_edges"] >= 1
+            assert result["diagnostics"]["llm_requested"] is False
+            assert result["diagnostics"]["llm_attempted"] is False
+            assert result["diagnostics"]["heuristic_fallback_used"] is False
+            assert result["diagnostics"]["chunk_count"] >= 1
+
+    def test_ontology_extract_defaults_to_heuristic_even_when_anthropic_is_configured(self, monkeypatch):
+        from opencrab.mcp.tools import dispatch_tool
+        from opencrab.ontology.extractor import LLMExtractor
+
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "configured")
+
+        with patch.object(
+            LLMExtractor,
+            "_extract_llm_chunks",
+            side_effect=AssertionError("default MCP extraction must stay heuristic"),
+        ):
+            with patch("opencrab.mcp.tools._get_context") as mock_ctx:
+                builder = MagicMock()
+                builder.add_node.return_value = {"stores": {"graph": "ok"}}
+                builder.add_edge.return_value = {"stores": {"graph": "ok"}}
+                mock_ctx.return_value = {
+                    "builder": builder,
+                    "rebac": MagicMock(),
+                    "impact": MagicMock(),
+                    "hybrid": MagicMock(),
+                    "documents": MagicMock(),
+                }
+
+                result = dispatch_tool(
+                    "ontology_extract",
+                    {
+                        "text": "Cache TTL improves reliability for the analytics pipeline.",
+                        "source_id": "pilot.md",
+                    },
+                )
+
+        assert result["extractor_mode"] == "heuristic"
+        assert result["extraction_errors"] == []
+        assert result["diagnostics"]["llm_requested"] is False
+        assert result["diagnostics"]["llm_attempted"] is False
+
+    def test_extractor_can_use_optional_llm_enrichment_mode(self):
+        from opencrab.ontology.extractor import ExtractedEdge, ExtractedNode, LLMExtractor
+
+        extractor = LLMExtractor(api_key="test-key", model="claude-haiku-4-5-20251001")
+
+        with patch.object(
+            extractor,
+            "_extract_llm_chunks",
+            return_value=(
+                [
+                    ExtractedNode(
+                        space="concept",
+                        node_type="Concept",
+                        node_id="cache-ttl",
+                        properties={"name": "Cache TTL"},
+                    )
+                ],
+                [
+                    ExtractedEdge(
+                        from_space="lever",
+                        from_id="cache_ttl",
+                        relation="raises",
+                        to_space="outcome",
+                        to_id="reliability",
+                    )
+                ],
+            ),
+        ):
+            result = extractor.extract_from_text(
+                "Cache TTL improves reliability.",
+                source_id="pilot.md",
+            )
+
+        assert result.mode == "anthropic"
+        assert result.llm_requested is True
+        assert result.llm_attempted is True
+        assert result.heuristic_fallback_used is False
+        assert result.chunk_count >= 1
+        assert any(node.space == "resource" for node in result.nodes)
+        assert any(node.node_id == "cache-ttl" for node in result.nodes)
+        assert any(edge.relation == "raises" for edge in result.edges)
+
+    def test_extractor_falls_back_to_heuristic_when_llm_path_fails(self):
+        from opencrab.ontology.extractor import LLMExtractor
+
+        extractor = LLMExtractor(api_key="test-key", model="claude-haiku-4-5-20251001")
+
+        with patch.object(extractor, "_extract_llm_chunks", side_effect=RuntimeError("llm down")):
+            result = extractor.extract_from_text(
+                "Cache TTL improves reliability for the analytics pipeline.",
+                source_id="pilot.md",
+            )
+
+        assert result.mode == "heuristic"
+        assert result.llm_requested is True
+        assert result.llm_attempted is True
+        assert result.heuristic_fallback_used is True
+        assert result.chunk_count >= 1
+        assert any(node.space == "concept" for node in result.nodes)
+        assert any(edge.relation == "supports" for edge in result.edges)
+        assert result.errors == ["llm down"]
 
     def test_reset_runtime_state_rebuilds_context(self, monkeypatch, tmp_path):
         from opencrab.mcp.tools import _get_context, reset_runtime_state

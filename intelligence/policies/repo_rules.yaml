@@ -15,6 +15,10 @@ policies:
     rule: "Agent-facing context bundles are derived, read-only outputs assembled from live local stores and must not become a second canonical source-of-truth."
   docs_sync:
     rule: "Changes to CLI, MCP, grammar, or stores require docs updates in the same task."
+  thin_fork_direction:
+    rule: "Treat little-crab as a thin backend/profile fork of OpenCrab: maximize reuse above the backend seam and keep divergence explicit in local-first runtime layers."
+  preserve_set_lock:
+    rule: "During thin-fork realignment, preserve the current local-first runtime, CLI/MCP surface, grammar/validator semantics, and backend topology unless an explicit architecture decision changes them."
   no_service_stack:
     rule: "Do not reintroduce service-backed DB infrastructure without explicit architecture review."
   scoped_query_scope:

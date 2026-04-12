@@ -454,6 +454,41 @@ class TestLocalFactory:
         assert store.embedding_model == "qwen3-embedding:4b"
         assert store.embedding_url == "http://localhost:11434"
 
+    def test_factory_builds_runtime_store_bundle(self, tmp_path):
+        from opencrab.config import Settings
+        from opencrab.stores.factory import make_runtime_stores
+
+        settings = Settings(
+            STORAGE_MODE="local",
+            LOCAL_DATA_DIR=str(tmp_path),
+            CHROMA_COLLECTION="runtime_bundle",
+            CHROMA_EMBEDDING_PROVIDER="onnx",
+        )
+
+        stores = make_runtime_stores(settings)
+
+        assert stores.documents is stores.sql
+        assert stores.graph.available is True
+        assert stores.vector.location == str(tmp_path / "chroma")
+
+    def test_factory_builds_runtime_services(self, tmp_path):
+        from opencrab.config import Settings
+        from opencrab.stores.factory import make_runtime_services
+
+        settings = Settings(
+            STORAGE_MODE="local",
+            LOCAL_DATA_DIR=str(tmp_path),
+            CHROMA_COLLECTION="runtime_services",
+            CHROMA_EMBEDDING_PROVIDER="onnx",
+        )
+
+        services = make_runtime_services(settings)
+
+        assert services.stores.documents is services.stores.sql
+        assert services.hybrid is not None
+        assert services.context_pipeline is not None
+        assert services.builder is not None
+
 
 class TestLocalRuntime:
     def test_builder_persists_docs_registry_and_audit(self, tmp_path):

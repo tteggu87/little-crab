@@ -48,6 +48,7 @@ The same preservation goal also applies to future read models and visualization 
 - `ReBACEngine` resolves explicit policy plus graph access paths.
 - `ImpactEngine` computes impact categories and persists analysis records.
 - `LLMExtractor` currently runs a deterministic heuristic extraction pass.
+- `LLMExtractor` now keeps deterministic heuristic extraction as the local-first floor, and only opts into Anthropic-backed chunked enrichment when a non-heuristic model is explicitly requested in a configured environment.
 - Together these components preserve OpenCrab's agentic loop: classify, connect, retrieve, inspect, and later fill missing structure.
 
 ### Storage Layer
