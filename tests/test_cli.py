@@ -76,6 +76,41 @@ def test_ingest_batches_vector_and_document_writes(monkeypatch, tmp_path):
     assert "Ingested 2/2 files." in result.output
 
 
+def test_ingest_chunks_large_batches(monkeypatch, tmp_path):
+    from opencrab import cli
+
+    _reset_runtime()
+    data_dir = tmp_path / "opencrab_data"
+    for idx in range(5):
+        (tmp_path / f"{idx}.md").write_text(f"doc {idx}")
+
+    vector = MagicMock()
+    vector.available = True
+    docs = MagicMock()
+    docs.available = True
+
+    monkeypatch.setattr("opencrab.stores.factory.make_vector_store", lambda cfg: vector)
+    monkeypatch.setattr("opencrab.stores.factory.make_doc_store", lambda cfg: docs)
+    monkeypatch.setattr(cli, "INGEST_BATCH_SIZE", 2)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        ["ingest", str(tmp_path), "--recursive"],
+        env={
+            "STORAGE_MODE": "local",
+            "LOCAL_DATA_DIR": str(data_dir),
+            "CHROMA_COLLECTION": "test_chunked_batch_ingest",
+            "CHROMA_EMBEDDING_PROVIDER": "onnx",
+        },
+    )
+
+    assert result.exit_code == 0
+    assert vector.upsert_texts.call_count == 3
+    assert docs.upsert_sources.call_count == 3
+    assert "Ingested 5/5 files." in result.output
+
+
 def test_cli_entrypoint_aliases_are_declared() -> None:
     pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
     project = tomllib.loads(pyproject.read_text(encoding="utf-8"))

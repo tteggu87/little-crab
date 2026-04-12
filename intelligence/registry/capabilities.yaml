@@ -1,7 +1,7 @@
 metadata:
   status: Active
   source_of_truth: false
-  last_updated: 2026-03-27
+  last_updated: 2026-04-12
   purpose: "Capability bindings from action keys to concrete Python entrypoints."
 
 capabilities:
@@ -20,6 +20,7 @@ capabilities:
   - key: cli.ingest
     status: active
     implementation: "opencrab.cli:ingest"
+    notes: "Uses chunked vector and DuckDB source batch writes by default, with per-file fallback on batch failure."
   - key: cli.query
     status: active
     implementation: "opencrab.cli:query"
@@ -44,6 +45,12 @@ capabilities:
   - key: script.dogfood_mcp
     status: active
     implementation: "scripts.dogfood_mcp:main"
+  - key: script.import_kakaotalk_csv
+    status: active
+    implementation: "scripts.import_kakaotalk_csv:main"
+  - key: script.promote_kakaotalk_semantics
+    status: active
+    implementation: "scripts.promote_kakaotalk_semantics:main"
   - key: script.verify_repo_intelligence
     status: active
     implementation: "scripts.verify_repo_intelligence:main"
@@ -65,6 +72,7 @@ capabilities:
   - key: mcp.ontology_query
     status: active
     implementation: "opencrab.mcp.tools:ontology_query"
+    notes: "Uses the agent context pipeline, which prefers batch DuckDB enrichment lookups and falls back to per-item reads if the batch path fails."
   - key: mcp.ontology_impact
     status: active
     implementation: "opencrab.mcp.tools:ontology_impact"

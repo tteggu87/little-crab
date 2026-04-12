@@ -81,9 +81,9 @@ The same preservation goal also applies to future read models and visualization 
 - Scoped query filters such as `project` and `source_id_prefix` intentionally disable graph expansion so hybrid results do not escape the caller's requested scope.
 - Embedded runtime state can be reset explicitly for tests and host reloads so settings and store caches rebuild against the current local configuration.
 - Agent-context enrichment is best-effort; supporting evidence and policy hint lookup failures should degrade into uncertainty and gap markers instead of aborting the full read path.
-- Agent-context enrichment should prefer batch lookups over per-fact store calls when the underlying local store supports them.
+- Agent-context enrichment should prefer batch lookups over per-fact store calls when the underlying local store supports them, but retry per-item when a batch lookup path fails.
 - Agent-facing context is derived, read-only output from `AgentContextPipeline`; it must not become a second canonical persistence layer.
-- CLI ingest should prefer batch vector/document writes and only fall back to per-file writes when the batch path fails.
+- CLI ingest should prefer chunked batch vector/document writes and only fall back to per-file writes when the batch path fails.
 - `node_id` remains globally unique across spaces.
 - The runtime is local-only.
 - The package surface is `little-crab`, while the import namespace remains `opencrab`.

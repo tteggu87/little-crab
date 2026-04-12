@@ -546,6 +546,66 @@ class TestToolDispatch:
         operational.check_policy.assert_not_called()
         assert bundle.supporting_evidence[0].text_excerpt.startswith("Batch supporting source")
 
+    def test_agent_context_pipeline_falls_back_to_single_item_after_batch_failure(self):
+        from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
+        from opencrab.ontology.query import QueryResult
+
+        hybrid = MagicMock()
+        hybrid.query.return_value = [
+            QueryResult(
+                source="vector",
+                node_id="doc-1",
+                score=0.92,
+                text="Doc summary",
+                metadata={"source_id": "src-1", "space": "resource"},
+            ),
+            QueryResult(
+                source="graph",
+                node_id="node-2",
+                score=0.5,
+                text="Node summary",
+                metadata={"space": "concept"},
+            ),
+        ]
+        documents = MagicMock()
+        documents.available = True
+        documents.get_sources.side_effect = RuntimeError("batch source down")
+        documents.get_source.side_effect = lambda source_id: {
+            "src-1": {"text": "Single source text", "metadata": {"project": "alpha"}}
+        }.get(source_id)
+        documents.get_node_docs.side_effect = RuntimeError("batch node-doc down")
+        documents.get_node_doc.side_effect = lambda space, node_id: (
+            {"properties": {"description": "Single node doc"}}
+            if (space, node_id) == ("concept", "node-2")
+            else None
+        )
+        operational = MagicMock()
+        operational.check_policies.side_effect = RuntimeError("batch policy down")
+        operational.check_policy.side_effect = lambda subject_id, permission, resource_id: {
+            "doc-1": True
+        }.get(resource_id)
+
+        pipeline = AgentContextPipeline(hybrid, documents, operational)
+        bundle = pipeline.build_context(
+            AgentContextRequest(
+                question="what can alice view",
+                subject_id="alice",
+                permission="view",
+            )
+        )
+        payload = bundle.to_dict()
+
+        documents.get_source.assert_called_once_with("src-1")
+        documents.get_node_doc.assert_called_once_with("concept", "node-2")
+        operational.check_policy.assert_called_once_with("alice", "view", "doc-1")
+        assert payload["supporting_evidence"][0]["text_excerpt"].startswith("Single source text")
+        assert payload["policies"][0]["status"] == "granted"
+        assert any(
+            "Batch lookup failed; retrying item-by-item" in note
+            or "Batch policy hint lookup failed; retrying item-by-item" in note
+            for note in payload["uncertainty"]["notes"]
+        )
+
     def test_agent_context_pipeline_degrades_when_enrichment_lookups_fail(self):
         from opencrab.ontology.context_pipeline import AgentContextPipeline, AgentContextRequest
         from opencrab.ontology.query import QueryResult

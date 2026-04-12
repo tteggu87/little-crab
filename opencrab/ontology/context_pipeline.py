@@ -558,24 +558,9 @@ class AgentContextPipeline:
                     or {}
                 )
             except Exception as exc:
-                for resource_id in resource_ids:
-                    enrichment_notes.append(
-                        f"Policy hint lookup failed for {resource_id}: {exc}"
-                    )
-                    missing_links.append(
-                        MissingLink(
-                            kind="policy_hint_unavailable",
-                            description=(
-                                f"Policy hint lookup failed for {resource_id}; "
-                                "the context bundle omitted policy hints for this resource."
-                            ),
-                            suggested_next_step=(
-                                "Retry after operational store recovery or inspect policies directly."
-                            ),
-                            metadata={"resource_id": resource_id, "error": str(exc)},
-                        )
-                    )
-                return {}
+                enrichment_notes.append(
+                    f"Batch policy hint lookup failed; retrying item-by-item: {exc}"
+                )
 
         policy_map: dict[str, bool] = {}
         for resource_id in resource_ids:
@@ -622,10 +607,9 @@ class AgentContextPipeline:
             try:
                 return dict(batch_loader(deduped_keys) or {})
             except Exception as exc:
-                for key in deduped_keys:
-                    enrichment_notes.append(failure_message(key, exc))
-                    missing_links.append(missing_link_factory(key, exc))
-                return {}
+                enrichment_notes.append(
+                    f"Batch lookup failed; retrying item-by-item: {exc}"
+                )
 
         results: dict[Any, dict[str, Any]] = {}
         for key in deduped_keys:

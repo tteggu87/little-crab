@@ -28,6 +28,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 console = Console()
+INGEST_BATCH_SIZE = 128
 
 
 # ---------------------------------------------------------------------------
@@ -295,43 +296,44 @@ def ingest(path: str, recursive: bool, extension: str) -> None:
 
     ok_count = 0
     if records:
-        vector_ids = [record["source_id"] for record in records]
-        vector_texts = [record["text"] for record in records]
-        vector_metadatas = [
-            {**record["metadata"], "source_id": record["source_id"]}
-            for record in records
-        ]
         try:
-            vector.upsert_texts(
-                texts=vector_texts,
-                metadatas=vector_metadatas,
-                ids=vector_ids,
-            )
-            if docs.available:
-                bulk_upsert = getattr(docs, "upsert_sources", None)
-                if callable(bulk_upsert):
-                    bulk_upsert(
-                        [
-                            {
-                                "source_id": source_id,
-                                "text": text,
-                                "metadata": record["metadata"],
-                            }
-                            for record, source_id, text in zip(
-                                records,
-                                vector_ids,
-                                vector_texts,
-                                strict=True,
-                            )
-                        ]
-                    )
-                else:
-                    for record in records:
-                        docs.upsert_source(
-                            record["source_id"],
-                            record["text"],
-                            record["metadata"],
+            for chunk in _iter_ingest_chunks(records):
+                vector_ids = [record["source_id"] for record in chunk]
+                vector_texts = [record["text"] for record in chunk]
+                vector_metadatas = [
+                    {**record["metadata"], "source_id": record["source_id"]}
+                    for record in chunk
+                ]
+                vector.upsert_texts(
+                    texts=vector_texts,
+                    metadatas=vector_metadatas,
+                    ids=vector_ids,
+                )
+                if docs.available:
+                    bulk_upsert = getattr(docs, "upsert_sources", None)
+                    if callable(bulk_upsert):
+                        bulk_upsert(
+                            [
+                                {
+                                    "source_id": source_id,
+                                    "text": text,
+                                    "metadata": record["metadata"],
+                                }
+                                for record, source_id, text in zip(
+                                    chunk,
+                                    vector_ids,
+                                    vector_texts,
+                                    strict=True,
+                                )
+                            ]
                         )
+                    else:
+                        for record in chunk:
+                            docs.upsert_source(
+                                record["source_id"],
+                                record["text"],
+                                record["metadata"],
+                            )
 
             ok_count = len(records)
             for record in records:
@@ -362,6 +364,13 @@ def ingest(path: str, recursive: bool, extension: str) -> None:
                     console.print(f"  [red]FAIL[/red] {record['file'].name}: {exc}")
 
     console.print(f"\n[bold green]Ingested {ok_count}/{len(files)} files.[/bold green]")
+
+
+def _iter_ingest_chunks(records: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    return [
+        records[index : index + INGEST_BATCH_SIZE]
+        for index in range(0, len(records), INGEST_BATCH_SIZE)
+    ]
 
 
 # ---------------------------------------------------------------------------

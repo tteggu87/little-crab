@@ -1,7 +1,7 @@
 ---
 status: Active
 source_of_truth: Yes
-last_updated: 2026-03-27
+last_updated: 2026-04-12
 superseded_by: N/A
 ---
 
@@ -25,6 +25,8 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 - CLI implementation: [opencrab/cli.py](/C:/python_Github/playground/little-crab/opencrab/cli.py)
 - MCP server: [opencrab/mcp/server.py](/C:/python_Github/playground/little-crab/opencrab/mcp/server.py)
 - Seed script: [scripts/seed_ontology.py](/C:/python_Github/playground/little-crab/scripts/seed_ontology.py)
+- KakaoTalk importer: [scripts/import_kakaotalk_csv.py](/C:/python_Github/playground/little-crab/scripts/import_kakaotalk_csv.py)
+- KakaoTalk semantic promotion: [scripts/promote_kakaotalk_semantics.py](/C:/python_Github/playground/little-crab/scripts/promote_kakaotalk_semantics.py)
 
 ## Runtime Topology
 
@@ -83,6 +85,7 @@ little-crab now treats the following OpenCrab flexibility traits as explicit pre
 - `little-crab` remains available as a legacy CLI alias.
 - `opencrab` remains available as a deprecated compatibility CLI alias.
 - The live runtime is the embedded local stack only.
+- The embedded Chroma vector path now supports either the default local ONNX embedding function or an Ollama-backed embedding model selected through environment configuration.
 - Grammar and MCP tool naming remain aligned with upstream OpenCrab semantics.
 - The MCP stdio server now accepts negotiated protocol versions, `notifications/initialized`, `resources/list`, `resources/templates/list`, and batched JSON-RPC requests.
 - Successful node and edge structural writes now follow graph persistence first; registry rows and success audits are emitted only after the graph record itself persists, while failed graph writes are tracked as failed attempts instead of live ontology truth.
@@ -91,11 +94,16 @@ little-crab now treats the following OpenCrab flexibility traits as explicit pre
 - `ontology_query` now assembles a derived `context` bundle through the read-only agent context pipeline while keeping legacy `results` for compatibility.
 - `littlecrab query` and `ontology_query` now surface trustability-oriented summary counts for confirmed facts, inferred facts, supporting evidence, provenance paths, and missing links.
 - Agent-context enrichment remains best-effort: supporting evidence or policy hint lookup failures degrade into `missing_links` and `uncertainty.notes` instead of aborting the full query response.
+- Agent-context enrichment now batches DuckDB-backed source, node-document, and policy lookups when the local store supports it, then falls back to per-item lookup if the batch path fails.
 - The agent context bundle is not a second SSOT; it is derived from the live local stores for agent-facing reasoning only.
 - User-facing runtime payloads now describe local roles such as `graph`, `documents`, `registry`, and `vectors` instead of removed backend brands.
 - `littlecrab doctor` now reports current runtime health and also runs an isolated write -> ingest -> query closure smoke.
+- `littlecrab ingest` now performs chunked vector upserts and document-source persistence by default, with per-file fallback only when the batch path fails.
 - `littlecrab stage-node`, `stage-edge`, `list-staged`, and `publish-stage` now provide a lightweight draft-before-publish workflow.
 - `ontology_bulk_add_nodes` and `ontology_bulk_add_edges` now provide batch-safe MCP write paths without changing the preserved single-write tool names.
+- `LadybugStore.find_neighbors` and `find_path` now reuse a traversal-scoped Ladybug connection instead of reopening handles for each adjacency query inside the same traversal.
+- `scripts/import_kakaotalk_csv.py` now provides a conservative signal-first room-corpus bootstrap path that imports KakaoTalk CSV exports as chatroom resources, participant subjects, per-message source records, and promoted evidence/vector records for higher-signal messages.
+- `scripts/promote_kakaotalk_semantics.py` now provides a second KakaoTalk ontology-growth pass that scans imported evidence nodes and promotes conservative concept, claim, and concept-to-concept structure with local heuristics.
 
 ## Compatibility Boundary
 
