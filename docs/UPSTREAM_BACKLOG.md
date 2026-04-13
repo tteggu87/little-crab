@@ -74,12 +74,12 @@ This means little-crab is now ready to begin **real upstream-lane adoption work*
 - **Classification**
   - `Adopt`
 - **Status**
-  - **Ready**
+  - **Initial parity slice complete**
 - **Why it matters**
   - reduces future merge cost
   - catches drift early
 - **Next action**
-  - keep the surrogate-sanitization regression test adopted and continue importing only clearly compatible parity cases
+  - continue importing only clearly compatible parity cases as they are discovered; no urgent parity gap is currently queued
 
 ### Lane D — Automation-ready outputs and diagnostics
 
@@ -126,9 +126,9 @@ This means little-crab is now ready to begin **real upstream-lane adoption work*
   - add thin adapters/shims for local contracts
   - postpone heavy customization until after a near-stock local boot path exists
 - **Status**
-  - **Inventory complete; ready for a first import plan**
+  - **First import complete**
 - **Next action**
-  - use `docs/WEB_UI_COMPATIBILITY_INVENTORY.md` to define the first local sidecar / near-stock import pass
+  - continue with later local-first refinements: write UX, better ontology-native grouping, and graph pagination/perf improvements
 
 ### Lane G — crabharness / orchestration product layers
 
@@ -145,9 +145,9 @@ This means little-crab is now ready to begin **real upstream-lane adoption work*
 
 1. **Lane A follow-through** — apply `docs/EXTRACTOR_DELTA_INVENTORY.md`
 2. **Lane B** — MCP/CLI protocol compatibility inventory and first reinterpretation target
-3. **Lane C** — test parity imports
-4. **Lane D follow-through** — next diagnostics/output standardization pass
-5. **Lane F** — web maximal-reuse compatibility inventory
+3. **Lane D follow-through** — next diagnostics/output standardization pass
+4. **Lane A follow-through** — deeper extractor/intelligence reuse
+5. **Lane F** — local operator web workbench follow-up refinements
 
 ## Ready Signal
 
