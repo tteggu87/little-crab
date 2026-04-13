@@ -57,14 +57,14 @@ This means little-crab is now ready to begin **real upstream-lane adoption work*
 - **Classification**
   - `Reinterpret`
 - **Status**
-  - **Ready to start**
+  - **Inventory complete; ready for a bounded follow-up patch**
 - **Why it matters**
   - keeps core interfaces closer to upstream
   - improves long-term syncability without requiring hosted/server-first runtime
 - **Constraints**
   - do not import remote deployment obligations into core little-crab
 - **Next action**
-  - inventory protocol/transport deltas and separate structure worth copying from surface area to exclude
+  - use `docs/MCP_PROTOCOL_COMPATIBILITY_INVENTORY.md` to choose the next bounded protocol/diagnostics follow-up
 
 ### Lane C — Tests and quality parity
 
@@ -79,7 +79,7 @@ This means little-crab is now ready to begin **real upstream-lane adoption work*
   - reduces future merge cost
   - catches drift early
 - **Next action**
-  - diff upstream test additions against current little-crab test matrix and import compatible cases
+  - keep the surrogate-sanitization regression test adopted and continue importing only clearly compatible parity cases
 
 ### Lane D — Automation-ready outputs and diagnostics
 
@@ -125,8 +125,10 @@ This means little-crab is now ready to begin **real upstream-lane adoption work*
   - prefer upstream UI code reuse first
   - add thin adapters/shims for local contracts
   - postpone heavy customization until after a near-stock local boot path exists
+- **Status**
+  - **Inventory complete; ready for a first import plan**
 - **Next action**
-  - create a web-compatibility inventory that separates \"usable mostly as-is\" from \"requires shim\" and \"exclude\"
+  - use `docs/WEB_UI_COMPATIBILITY_INVENTORY.md` to define the first local sidecar / near-stock import pass
 
 ### Lane G — crabharness / orchestration product layers
 

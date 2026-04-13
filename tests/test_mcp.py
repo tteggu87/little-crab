@@ -880,6 +880,29 @@ class TestMCPServer:
         assert "spaces" in grammar
         assert "meta_edges" in grammar
 
+    def test_handle_tools_call_escapes_invalid_surrogates(self, server):
+        request = json.dumps({
+            "jsonrpc": "2.0",
+            "id": 33,
+            "method": "tools/call",
+            "params": {
+                "name": "ontology_manifest",
+                "arguments": {},
+            },
+        })
+
+        with patch(
+            "opencrab.mcp.server.dispatch_tool",
+            return_value={"text": "bad\ud800value"},
+        ):
+            response = server._handle_raw(request)
+
+        content = response["result"]["content"]
+        assert len(content) == 1
+        assert content[0]["type"] == "text"
+        assert "\\ud800" in content[0]["text"]
+        assert "\ud800" not in content[0]["text"]
+
     def test_handle_tools_call_missing_name(self, server):
         request = json.dumps({
             "jsonrpc": "2.0", "id": 4,
