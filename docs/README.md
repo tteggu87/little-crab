@@ -31,6 +31,8 @@ That preserved flexibility is now an explicit project goal, not an implied one. 
 - [UPSTREAM_TRAJECTORY.md](UPSTREAM_TRAJECTORY.md)
 - [FORK_BOUNDARY.md](FORK_BOUNDARY.md)
 - [PHASE3_ADOPTION_REVIEW.md](PHASE3_ADOPTION_REVIEW.md)
+- [UPSTREAM_BACKLOG.md](UPSTREAM_BACKLOG.md)
+- [EXTRACTOR_DELTA_INVENTORY.md](EXTRACTOR_DELTA_INVENTORY.md)
 
 ## Design Notes
 
