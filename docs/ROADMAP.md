@@ -24,7 +24,7 @@ superseded_by: N/A
 
 ## Likely Next Work
 
-1. Polaris-based visualization sidecar for little-crab.
+1. Continue the first-pass local operator web shell and compatibility shim from the upstream web lane.
 2. Stronger repo-level docs portal and docs classification.
 3. Optional module renaming from `opencrab` to `little_crab` if compatibility cost becomes acceptable.
 4. Upstream extractor/intelligence review as the first deliberate trajectory catch-up lane.
@@ -34,6 +34,7 @@ superseded_by: N/A
    - `opencrab/config.py`
    - `opencrab/stores/factory.py`
 6. Phase 3 adoption review complete; next aligned lane is automation-ready outputs and explicit diagnostics.
+7. Maintain an explicit upstream catch-up backlog so adoption proceeds one lane at a time instead of through broad merge attempts.
 
 Any Polaris-based sidecar should be evaluated against those flexibility goals, not only against visual polish.
 

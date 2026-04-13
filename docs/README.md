@@ -85,6 +85,8 @@ The current MCP surface now includes batch-safe write helpers `ontology_bulk_add
 
 The current local ingestion path also includes a staged KakaoTalk workflow: bootstrap chatroom resources, participants, sources, and evidence first, then run a second local heuristic pass to promote selected evidence into concept and claim nodes.
 
+The repo now also includes a first-pass local operator web shell plus a local API shim for read-only graph inspection and query, built to maximize reuse of upstream OpenCrab web assets before custom UI divergence.
+
 ## Project Intent
 
 - preserve OpenCrab's grammar, validator rules, and MCP-facing ontology workflow

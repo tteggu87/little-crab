@@ -25,6 +25,8 @@ The specific inheritance worth keeping is the grammar-guided agent workflow: age
 - CLI implementation: [opencrab/cli.py](/C:/python_Github/playground/little-crab/opencrab/cli.py)
 - MCP server: [opencrab/mcp/server.py](/C:/python_Github/playground/little-crab/opencrab/mcp/server.py)
 - Seed script: [scripts/seed_ontology.py](/C:/python_Github/playground/little-crab/scripts/seed_ontology.py)
+- Local UI API shim: [apps/api/main.py](/C:/python_Github/playground/little-crab/apps/api/main.py)
+- Local UI web shell: [apps/web/app/dashboard/page.tsx](/C:/python_Github/playground/little-crab/apps/web/app/dashboard/page.tsx)
 - KakaoTalk importer: [scripts/import_kakaotalk_csv.py](/C:/python_Github/playground/little-crab/scripts/import_kakaotalk_csv.py)
 - KakaoTalk semantic promotion: [scripts/promote_kakaotalk_semantics.py](/C:/python_Github/playground/little-crab/scripts/promote_kakaotalk_semantics.py)
 
@@ -99,6 +101,7 @@ little-crab now treats the following OpenCrab flexibility traits as explicit pre
 - `ontology_extract` now follows the first extractor trajectory catch-up path: deterministic heuristic bootstrap remains the default, and Anthropic-backed chunked extraction is opt-in only when a non-heuristic model is explicitly requested in a configured environment.
 - User-facing runtime payloads now describe local roles such as `graph`, `documents`, `registry`, and `vectors` instead of removed backend brands.
 - `littlecrab doctor` now reports current runtime health and also runs an isolated write -> ingest -> query closure smoke.
+- a first-pass local operator web shell and local API shim now exist for read-only graph inspection and query, using upstream web assets where reuse was nearly direct.
 - `littlecrab ingest` now performs chunked vector upserts and document-source persistence by default, with per-file fallback only when the batch path fails.
 - `littlecrab stage-node`, `stage-edge`, `list-staged`, and `publish-stage` now provide a lightweight draft-before-publish workflow.
 - `ontology_bulk_add_nodes` and `ontology_bulk_add_edges` now provide batch-safe MCP write paths without changing the preserved single-write tool names.

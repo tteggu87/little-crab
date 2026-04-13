@@ -109,6 +109,8 @@ class RegistryStore(Protocol):
         self, from_space: str, from_id: str, relation: str, to_space: str, to_id: str
     ) -> None: ...
 
+    def list_edges(self, limit: int = 1000) -> list[dict[str, Any]]: ...
+
 
 @runtime_checkable
 class PolicyStore(Protocol):

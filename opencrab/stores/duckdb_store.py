@@ -563,6 +563,32 @@ class DuckDBStore:
                 [from_space, from_id, relation, to_space, to_id],
             )
 
+    def list_edges(self, limit: int = 1000) -> list[dict[str, Any]]:
+        if not self._available:
+            raise RuntimeError("DuckDB store is not available.")
+
+        with self._connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT from_space, from_id, relation, to_space, to_id, created_at
+                FROM ontology_edges
+                ORDER BY created_at ASC
+                LIMIT ?
+                """,
+                [limit],
+            ).fetchall()
+        return [
+            {
+                "from_space": row[0],
+                "from_id": row[1],
+                "relation": row[2],
+                "to_space": row[3],
+                "to_id": row[4],
+                "created_at": str(row[5]),
+            }
+            for row in rows
+        ]
+
     # ------------------------------------------------------------------
     # Impact records
     # ------------------------------------------------------------------
